@@ -1,0 +1,50 @@
+import { Suspense, type ReactNode } from "react";
+
+export const dynamic = "force-dynamic";
+
+import { auth } from "@/auth";
+import { WorkspaceSkeleton } from "@/components/page-skeletons";
+import { SchemaMigrationNotice } from "@/components/SchemaMigrationNotice";
+import { WorkspaceShell } from "@/components/WorkspaceShell";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { loadWorkspaceDocs } from "@/lib/list-workspace-docs";
+
+export default function DocLayout({ children }: { children: ReactNode }) {
+  return (
+    <Suspense fallback={<WorkspaceSkeleton />}>
+      <DocFrame>{children}</DocFrame>
+    </Suspense>
+  );
+}
+
+async function DocFrame({ children }: { children: ReactNode }) {
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    return (
+      <TooltipProvider>
+        <div className="h-full min-h-0 flex-1 overflow-y-auto overscroll-contain">{children}</div>
+      </TooltipProvider>
+    );
+  }
+
+  const loaded = await loadWorkspaceDocs(session.user.id);
+  if (!loaded.ok) {
+    if (loaded.schemaMismatch) {
+      return <SchemaMigrationNotice detail={loaded.detail} />;
+    }
+    throw new Error(loaded.detail);
+  }
+
+  return (
+    <TooltipProvider>
+      <WorkspaceShell
+        documents={loaded.documents}
+        userName={session.user.name}
+        userImage={session.user.image}
+      >
+        {children}
+      </WorkspaceShell>
+    </TooltipProvider>
+  );
+}

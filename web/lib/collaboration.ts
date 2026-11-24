@@ -1,0 +1,85 @@
+import type { HocuspocusProvider } from "@hocuspocus/provider";
+import { HocuspocusProvider as Provider } from "@hocuspocus/provider";
+import * as Y from "yjs";
+
+import type { CollabRole } from "./collab-token";
+import { ensureYjsAttributes } from "./sync-editor";
+
+const hocuspocusUrl =
+  process.env.NEXT_PUBLIC_HOCUSPOCUS_URL ?? "ws://localhost:1234";
+
+export type CollabBootstrap = {
+  token: string;
+  role: CollabRole;
+  userId: string;
+  name: string;
+  image?: string | null;
+};
+
+export type CollabSession = CollabBootstrap & {
+  ydoc: Y.Doc;
+  provider: HocuspocusProvider;
+};
+
+const sessions = new Map<string, CollabSession>();
+
+function bytesFromBase64(value: string) {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes;
+}
+
+export function openSession(
+  documentId: string,
+  bootstrap: CollabBootstrap,
+  initialState?: string | null,
+): CollabSession {
+  ensureYjsAttributes();
+  const existing = sessions.get(documentId);
+  if (existing) {
+    existing.name = bootstrap.name;
+    existing.image = bootstrap.image ?? null;
+    if (existing.token !== bootstrap.token) {
+      existing.token = bootstrap.token;
+      existing.provider.configuration.token = bootstrap.token;
+    }
+    return existing;
+  }
+
+  const ydoc = new Y.Doc();
+  if (initialState) {
+    try {
+      Y.applyUpdate(ydoc, bytesFromBase64(initialState));
+    } catch {
+      // A bad snapshot still leaves the live session able to load the note.
+    }
+  }
+  const provider = new Provider({
+    url: hocuspocusUrl,
+    name: documentId,
+    document: ydoc,
+    token: bootstrap.token,
+    onAuthenticationFailed: () => {},
+  });
+
+  const session: CollabSession = { ydoc, provider, ...bootstrap };
+  sessions.set(documentId, session);
+  return session;
+}
+
+export async function refreshCollabToken(documentId: string, session: CollabSession) {
+  const response = await fetch("/api/collab/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ documentId }),
+  });
+  if (!response.ok) return false;
+  const body = (await response.json()) as { token?: string };
+  if (!body.token) return false;
+  session.token = body.token;
+  session.provider.configuration.token = body.token;
+  return true;
+}

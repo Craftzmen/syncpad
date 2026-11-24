@@ -22,6 +22,11 @@ function resolveAuthSecret() {
     );
     return "syncpad-dev-auth-secret-local-only";
   }
+  // Next evaluates route modules while collecting page data. The real secret
+  // is read again when the server handles a request.
+  if (process.env.NEXT_PHASE === "phase-production-build") {
+    return "syncpad-build-placeholder";
+  }
   throw new Error("AUTH_SECRET is required in production");
 }
 

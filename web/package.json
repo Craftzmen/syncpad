@@ -44,7 +44,7 @@
     "drizzle-orm": "^0.45.4",
     "highlight.js": "^11.11.2",
     "jose": "^6.2.18",
-    "katex": "^0.19.1",
+    "katex": "0.18.10",
     "lowlight": "^3.3.0",
     "lucide-react": "^1.76.0",
     "mermaid": "^11.17.2",

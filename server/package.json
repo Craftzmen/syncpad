@@ -1,0 +1,23 @@
+{
+  "name": "server",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.mjs",
+    "dev": "node index.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@hocuspocus/server": "^4.8.0",
+    "@neondatabase/serverless": "^1.2.1",
+    "jose": "^6.2.18",
+    "yjs": "^13.6.33"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

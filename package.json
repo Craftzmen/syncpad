@@ -1,0 +1,10 @@
+{
+  "name": "syncpad",
+  "private": true,
+  "scripts": {
+    "dev:web": "npm run dev --prefix web",
+    "dev:server": "npm start --prefix server",
+    "build": "npm run build --prefix web",
+    "db:push": "npm run db:push --prefix web"
+  }
+}

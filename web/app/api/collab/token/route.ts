@@ -35,12 +35,16 @@ export async function POST(request: Request) {
   const name =
     session?.user?.name ?? (role === "view" ? "Viewer" : "Guest editor");
 
-  const token = await signCollabToken({
-    docId: documentId,
-    userId,
-    role,
-    name,
-  });
-
-  return NextResponse.json({ token, role, userId, name });
+  try {
+    const token = await signCollabToken({
+      docId: documentId,
+      userId,
+      role,
+      name,
+    });
+    return NextResponse.json({ token, role, userId, name });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not sign a collaboration token";
+    return NextResponse.json({ error: message }, { status: 503 });
+  }
 }

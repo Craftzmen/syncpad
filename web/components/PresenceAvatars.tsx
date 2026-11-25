@@ -12,7 +12,7 @@ type AwarenessUser = {
   self?: boolean;
 };
 
-export function PresenceAvatars({ provider }: { provider: HocuspocusProvider }) {
+export function PresenceAvatars({ provider }: { provider: HocuspocusProvider | null }) {
   const [users, setUsers] = useState<AwarenessUser[]>([]);
   const [slot, setSlot] = useState<HTMLElement | null>(null);
 
@@ -21,7 +21,7 @@ export function PresenceAvatars({ provider }: { provider: HocuspocusProvider }) 
   }, []);
 
   useEffect(() => {
-    const awareness = provider.awareness;
+    const awareness = provider?.awareness;
     if (!awareness) return;
 
     const sync = () => {

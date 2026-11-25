@@ -88,6 +88,7 @@ export function DocWorkspace({
   showComments,
   viewerName,
   viewerImage,
+  collabError = null,
   children,
 }: {
   documentId: string;
@@ -101,6 +102,7 @@ export function DocWorkspace({
   showComments: boolean;
   viewerName?: string | null;
   viewerImage?: string | null;
+  collabError?: string | null;
   children: ReactNode;
 }) {
   const [title, setTitle] = useState(initialTitle);
@@ -288,6 +290,14 @@ export function DocWorkspace({
         onCommentsToggle={() => setCommentsOpen((value) => !value)}
         onShare={() => setShareOpen(true)}
       />
+      {collabError ? (
+        <p
+          data-collab-error={collabError}
+          className="border-b border-black/[0.06] bg-[#fbf8f2] px-4 py-2 text-center text-[13px] text-[#6b4e16]"
+        >
+          Live editing is off on this host. Set HOCUSPOCUS_SECRET to the same value as the collaboration server, then redeploy.
+        </p>
+      ) : null}
 
       <div className="relative flex min-h-0 min-w-0 flex-1">
       <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain">

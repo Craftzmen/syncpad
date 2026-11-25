@@ -10,7 +10,9 @@ export type CollabClaims = {
 };
 
 function secretKey() {
-  const secret = process.env.HOCUSPOCUS_SECRET;
+  // Computed access stays a runtime read. A direct process.env.HOCUSPOCUS_SECRET
+  // lookup can be frozen to whatever was present when the server was built.
+  const secret = process.env["HOCUSPOCUS_SECRET"];
   if (!secret) {
     throw new Error("HOCUSPOCUS_SECRET is not set");
   }

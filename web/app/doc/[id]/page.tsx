@@ -68,12 +68,20 @@ export default async function DocumentPage({ params }: PageProps) {
     .from(yjsDocumentState)
     .where(eq(yjsDocumentState.documentId, id))
     .limit(1);
-  const collabToken = await signCollabToken({
-    docId: id,
-    userId: session?.user?.id ?? `guest:${shareToken ?? "anon"}`,
-    role,
-    name: session?.user?.name ?? (role === "view" ? "Viewer" : "Guest"),
-  });
+  const viewerId = session?.user?.id ?? `guest:${shareToken ?? "anon"}`;
+  const viewerName = session?.user?.name ?? (role === "view" ? "Viewer" : "Guest");
+  let collabToken = "";
+  let collabError: string | null = null;
+  try {
+    collabToken = await signCollabToken({
+      docId: id,
+      userId: viewerId,
+      role,
+      name: viewerName,
+    });
+  } catch (error) {
+    collabError = error instanceof Error ? error.message : "Could not sign a collaboration token";
+  }
 
   return (
     <DocWorkspace
@@ -82,22 +90,30 @@ export default async function DocumentPage({ params }: PageProps) {
       initialIcon={doc.icon}
       initialCoverColor={doc.coverColor}
       initialFavorite={doc.isFavorite}
-      updatedAt={doc.updatedAt.toISOString()}
+      updatedAt={isoTimestamp(doc.updatedAt)}
       editedBy={session?.user?.name}
       canEdit={canEdit}
       showComments={!!session?.user}
       viewerName={session?.user?.name ?? null}
       viewerImage={session?.user?.image ?? null}
+      collabError={collabError}
     >
       <EditorPage
         docId={id}
         token={collabToken}
         role={role}
-        userId={session?.user?.id ?? `guest:${shareToken ?? "anon"}`}
-        name={session?.user?.name ?? "Guest"}
+        userId={viewerId}
+        name={viewerName}
         image={session?.user?.image ?? null}
         initialState={stateRow?.state ?? null}
       />
     </DocWorkspace>
   );
+}
+
+function isoTimestamp(value: Date | string) {
+  if (value instanceof Date) return value.toISOString();
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return new Date(0).toISOString();
+  return parsed.toISOString();
 }

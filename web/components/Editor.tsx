@@ -271,15 +271,19 @@ function CollabEditor({ docId, session }: InnerProps) {
         },
       }),
       Collaboration.configure({ document: session.ydoc }),
-      CollaborationCaret.configure({
-        provider: session.provider,
-        user: {
-          id: session.userId,
-          name: userName,
-          color: userColor,
-          image: session.image ?? undefined,
-        },
-      }),
+      ...(session.provider
+        ? [
+            CollaborationCaret.configure({
+              provider: session.provider,
+              user: {
+                id: session.userId,
+                name: userName,
+                color: userColor,
+                image: session.image ?? undefined,
+              },
+            }),
+          ]
+        : []),
       Placeholder.configure({
         placeholder: role === "edit" ? "Press '/' to insert blocks" : "View only",
       }),
@@ -290,8 +294,8 @@ function CollabEditor({ docId, session }: InnerProps) {
   const editor = useEditor(
     {
       immediatelyRender: true,
-      editable: role === "edit",
-      autofocus: role === "edit" ? "end" : false,
+      editable: role === "edit" && session.provider != null,
+      autofocus: role === "edit" && session.provider != null ? "end" : false,
       extensions,
       editorProps: {
         attributes: {
@@ -350,13 +354,14 @@ function CollabEditor({ docId, session }: InnerProps) {
   }, []);
 
   useEffect(() => {
+    if (!session.provider) return;
     editor?.commands.updateUser({
       id: session.userId,
       name: userName,
       color: userColor,
       image: session.image ?? undefined,
     });
-  }, [editor, session.image, session.userId, userColor, userName]);
+  }, [editor, session.image, session.provider, session.userId, userColor, userName]);
 
   useEffect(() => {
     if (!editor) return;
@@ -378,7 +383,8 @@ function CollabEditor({ docId, session }: InnerProps) {
   }, [editor]);
 
   useLayoutEffect(() => {
-    if (!editor || role !== "edit") return;
+    const provider = session.provider;
+    if (!editor || role !== "edit" || !provider) return;
     patchLiveBinding(editor);
     let syncTimer = 0;
     let edited = false;
@@ -387,15 +393,15 @@ function CollabEditor({ docId, session }: InnerProps) {
       if (!pushEditorToYjs(editor, session.ydoc)) return;
       edited = true;
       window.clearTimeout(syncTimer);
-      syncTimer = window.setTimeout(() => session.provider.forceSync(), 300);
+      syncTimer = window.setTimeout(() => provider.forceSync(), 300);
     };
     const saveIfAhead = () => {
-      if (!session.provider.synced || editor.isDestroyed) return;
+      if (!provider.synced || editor.isDestroyed) return;
       if (!localChangesMissing(editor, session.ydoc)) return;
       save();
     };
     saveIfAhead();
-    session.provider.on("synced", saveIfAhead);
+    provider.on("synced", saveIfAhead);
     const onUpdate = ({ transaction }: { transaction: Transaction }) => {
       if (!transaction.docChanged) return;
       const meta = transaction.getMeta(ySyncPluginKey) as { isChangeOrigin?: boolean } | undefined;
@@ -405,13 +411,13 @@ function CollabEditor({ docId, session }: InnerProps) {
     };
     const flush = () => {
       if (!edited || editor.isDestroyed) return;
-      if (pushEditorToYjs(editor, session.ydoc)) session.provider.forceSync();
+      if (pushEditorToYjs(editor, session.ydoc)) provider.forceSync();
     };
     editor.on("update", onUpdate);
     window.addEventListener("pagehide", flush);
     return () => {
       flush();
-      session.provider.off("synced", saveIfAhead);
+      provider.off("synced", saveIfAhead);
       editor.off("update", onUpdate);
       window.removeEventListener("pagehide", flush);
       window.clearTimeout(syncTimer);
@@ -419,7 +425,8 @@ function CollabEditor({ docId, session }: InnerProps) {
   }, [editor, role, session]);
 
   useEffect(() => {
-    if (role !== "edit") return;
+    const provider = session.provider;
+    if (role !== "edit" || !provider) return;
     let stopped = false;
     let retrying = false;
     const refresh = () => refreshCollabToken(docId, session);
@@ -429,8 +436,8 @@ function CollabEditor({ docId, session }: InnerProps) {
       void refresh()
         .then((ok) => {
           if (stopped || !ok) return;
-          session.provider.disconnect();
-          void session.provider.connect();
+          provider.disconnect();
+          void provider.connect();
         })
         .finally(() => {
           window.setTimeout(() => {
@@ -438,19 +445,19 @@ function CollabEditor({ docId, session }: InnerProps) {
           }, 15000);
         });
     };
-    session.provider.on("authenticationFailed", onFail);
+    provider.on("authenticationFailed", onFail);
     const interval = window.setInterval(() => {
       void refresh();
     }, 30 * 60 * 1000);
     return () => {
       stopped = true;
-      session.provider.off("authenticationFailed", onFail);
+      provider.off("authenticationFailed", onFail);
       window.clearInterval(interval);
     };
   }, [docId, role, session]);
 
   useEffect(() => {
-    if (!editor || role !== "edit") return;
+    if (!editor || role !== "edit" || !session.provider) return;
     const onInsert = (event: Event) => {
       consumePendingInsert();
       applyInsert(editor, (event as CustomEvent<InsertKind>).detail);
@@ -464,7 +471,7 @@ function CollabEditor({ docId, session }: InnerProps) {
       window.removeEventListener("syncpad:insert", onInsert);
       window.removeEventListener("syncpad:title-enter", onTitleEnter);
     };
-  }, [editor, role]);
+  }, [editor, role, session.provider]);
 
   return (
     <>

@@ -18,7 +18,7 @@ export type CollabBootstrap = {
 
 export type CollabSession = CollabBootstrap & {
   ydoc: Y.Doc;
-  provider: HocuspocusProvider;
+  provider: HocuspocusProvider | null;
 };
 
 const sessions = new Map<string, CollabSession>();
@@ -44,7 +44,9 @@ export function openSession(
     existing.image = bootstrap.image ?? null;
     if (existing.token !== bootstrap.token) {
       existing.token = bootstrap.token;
-      existing.provider.configuration.token = bootstrap.token;
+      if (existing.provider) {
+        existing.provider.configuration.token = bootstrap.token;
+      }
     }
     return existing;
   }
@@ -57,13 +59,15 @@ export function openSession(
       // A bad snapshot still leaves the live session able to load the note.
     }
   }
-  const provider = new Provider({
-    url: hocuspocusUrl,
-    name: documentId,
-    document: ydoc,
-    token: bootstrap.token,
-    onAuthenticationFailed: () => {},
-  });
+  const provider = bootstrap.token
+    ? new Provider({
+        url: hocuspocusUrl,
+        name: documentId,
+        document: ydoc,
+        token: bootstrap.token,
+        onAuthenticationFailed: () => {},
+      })
+    : null;
 
   const session: CollabSession = { ydoc, provider, ...bootstrap };
   sessions.set(documentId, session);
@@ -78,7 +82,7 @@ export async function refreshCollabToken(documentId: string, session: CollabSess
   });
   if (!response.ok) return false;
   const body = (await response.json()) as { token?: string };
-  if (!body.token) return false;
+  if (!body.token || !session.provider) return false;
   session.token = body.token;
   session.provider.configuration.token = body.token;
   return true;

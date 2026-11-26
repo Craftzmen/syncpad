@@ -451,11 +451,11 @@ function CollabEditor({ docId, session }: InnerProps) {
     let timer = 0;
     let dirty = false;
     const flush = () => {
-      if (!dirty || editor.isDestroyed) return;
+      if (!dirty) return;
       dirty = false;
       window.clearTimeout(timer);
       try {
-        pushEditorToYjs(editor, session.ydoc);
+        if (!editor.isDestroyed) pushEditorToYjs(editor, session.ydoc);
         persistDocumentState(docId, encodeDocumentState(session.ydoc));
       } catch (error) {
         console.error("Could not save the document", error);

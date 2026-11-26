@@ -116,17 +116,18 @@ export function DocWorkspace({
 }) {
   const router = useRouter();
   const workspace = useWorkspace();
+  const listed = workspace?.docs.find((doc) => doc.id === documentId);
+  const startingTitle = listed?.title ?? initialTitle;
   const [restoring, setRestoring] = useState(false);
-  const [title, setTitle] = useState(initialTitle);
-  const titleRef = useRef(initialTitle);
+  const [title, setTitle] = useState(startingTitle);
+  const titleRef = useRef(startingTitle);
   const titleTimer = useRef(0);
-  const [icon, setIcon] = useState<string | null>(initialIcon);
+  const [icon, setIcon] = useState<string | null>(listed ? (listed.icon ?? null) : initialIcon);
   const [coverColor, setCoverColor] = useState<string | null>(initialCoverColor);
   const [favoriteFallback, setFavoriteFallback] = useState(initialFavorite);
   const [favoriteLoading, setFavoriteLoading] = useState(false);
   const [pinnedFallback, setPinnedFallback] = useState(initialPinned);
   const [pinLoading, setPinLoading] = useState(false);
-  const listed = workspace?.docs.find((doc) => doc.id === documentId);
 
   function applyTitle(next: string) {
     titleRef.current = next;

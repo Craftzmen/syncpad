@@ -12,6 +12,12 @@ import {
 
 import { AppSidebar } from "@/components/AppSidebar";
 import { CommandPalette } from "@/components/CommandPalette";
+import {
+  mergeServerDocs,
+  rememberAdded,
+  rememberPatch,
+  rememberRemoved,
+} from "@/lib/workspace-memory";
 
 export type SidebarDoc = {
   id: string;
@@ -54,51 +60,13 @@ export function WorkspaceShell({
   children: ReactNode;
 }) {
   const router = useRouter();
-  const [docs, setDocs] = useState(documents);
+  const [docs, setDocs] = useState(() => mergeServerDocs(documents));
   const [commandOpen, setCommandOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const creatingRef = useRef(false);
-  const overrides = useRef({
-    added: new Map<string, SidebarDoc>(),
-    removed: new Set<string>(),
-  });
-  const patches = useRef(new Map<string, Partial<SidebarDoc>>());
-
-  function applyPatches(list: SidebarDoc[]) {
-    return list.map((doc) => {
-      const patch = patches.current.get(doc.id);
-      if (!patch) return doc;
-      const keys = Object.keys(patch) as (keyof SidebarDoc)[];
-      const caughtUp = keys.every((key) => doc[key] === patch[key]);
-      if (caughtUp) {
-        patches.current.delete(doc.id);
-        return doc;
-      }
-      return { ...doc, ...patch };
-    });
-  }
-
-  function mergeDocs(serverDocs: SidebarDoc[]) {
-    const serverIds = new Set(serverDocs.map((doc) => doc.id));
-    for (const id of overrides.current.removed) {
-      if (!serverIds.has(id)) overrides.current.removed.delete(id);
-    }
-    for (const id of [...overrides.current.added.keys()]) {
-      if (serverIds.has(id)) overrides.current.added.delete(id);
-    }
-    const extras = [...overrides.current.added.values()].filter(
-      (doc) => !overrides.current.removed.has(doc.id),
-    );
-    return applyPatches([
-      ...extras,
-      ...serverDocs.filter(
-        (doc) => !overrides.current.removed.has(doc.id) && !overrides.current.added.has(doc.id),
-      ),
-    ]);
-  }
 
   useEffect(() => {
-    setDocs(mergeDocs(documents));
+    setDocs(mergeServerDocs(documents));
   }, [documents]);
 
   async function createDoc() {
@@ -113,8 +81,7 @@ export function WorkspaceShell({
       isFavorite: false,
       isPinned: false,
     };
-    overrides.current.removed.delete(id);
-    overrides.current.added.set(id, optimistic);
+    rememberAdded(optimistic);
     setDocs((current) => [optimistic, ...current.filter((item) => item.id !== id)]);
     setCommandOpen(false);
     router.push(`/doc/${id}`);
@@ -125,8 +92,7 @@ export function WorkspaceShell({
         body: JSON.stringify({ id }),
       });
       if (!res.ok) {
-        overrides.current.added.delete(id);
-        overrides.current.removed.add(id);
+        rememberRemoved(id);
         setDocs((current) => current.filter((item) => item.id !== id));
         router.push("/dashboard");
       }
@@ -137,21 +103,17 @@ export function WorkspaceShell({
   }
 
   function rememberDoc(doc: SidebarDoc) {
-    overrides.current.removed.delete(doc.id);
-    overrides.current.added.set(doc.id, doc);
+    rememberAdded(doc);
     setDocs((current) => [doc, ...current.filter((item) => item.id !== doc.id)]);
   }
 
   function forgetDoc(id: string) {
-    overrides.current.added.delete(id);
-    overrides.current.removed.add(id);
+    rememberRemoved(id);
     setDocs((current) => current.filter((item) => item.id !== id));
   }
 
   function patchDoc(id: string, partial: Partial<SidebarDoc>) {
-    const added = overrides.current.added.get(id);
-    if (added) overrides.current.added.set(id, { ...added, ...partial });
-    patches.current.set(id, { ...patches.current.get(id), ...partial });
+    rememberPatch(id, partial);
     setDocs((current) =>
       current.map((item) => (item.id === id ? { ...item, ...partial } : item)),
     );

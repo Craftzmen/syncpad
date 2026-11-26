@@ -338,6 +338,7 @@ function PageLink({
   const [name, setName] = useState(doc.title);
   const nameTimer = useRef(0);
   const nameOrigin = useRef(doc.title);
+  const pendingName = useRef<string | null>(null);
   const skipBlur = useRef(false);
 
   useEffect(() => {
@@ -345,18 +346,31 @@ function PageLink({
   }, [doc.title, renaming]);
 
   useEffect(() => {
-    return () => window.clearTimeout(nameTimer.current);
-  }, []);
+    return () => {
+      window.clearTimeout(nameTimer.current);
+      const title = pendingName.current;
+      if (!title) return;
+      pendingName.current = null;
+      saveDocumentTitle(doc.id, title);
+    };
+  }, [doc.id]);
 
   function publishName(value: string) {
     const title = canonicalTitle(value);
+    pendingName.current = title;
     workspace?.patchDoc(doc.id, { title });
     window.clearTimeout(nameTimer.current);
-    nameTimer.current = window.setTimeout(() => saveDocumentTitle(doc.id, title), 200);
+    nameTimer.current = window.setTimeout(() => {
+      nameTimer.current = 0;
+      pendingName.current = null;
+      saveDocumentTitle(doc.id, title);
+    }, 200);
   }
 
   function commitName(value: string) {
     window.clearTimeout(nameTimer.current);
+    nameTimer.current = 0;
+    pendingName.current = null;
     const title = canonicalTitle(value);
     setRenaming(false);
     workspace?.patchDoc(doc.id, { title });
@@ -366,6 +380,8 @@ function PageLink({
   function cancelName() {
     skipBlur.current = true;
     window.clearTimeout(nameTimer.current);
+    nameTimer.current = 0;
+    pendingName.current = null;
     const title = nameOrigin.current;
     setName(title);
     setRenaming(false);

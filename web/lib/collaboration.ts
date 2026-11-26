@@ -81,6 +81,13 @@ export function openSession(
         existing.provider.configuration.token = bootstrap.token;
       }
     }
+    if (initialState) {
+      try {
+        Y.applyUpdate(existing.ydoc, bytesFromBase64(initialState));
+      } catch {
+        // An older snapshot stays behind the edits already in this note.
+      }
+    }
     return existing;
   }
 

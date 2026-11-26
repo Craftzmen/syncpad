@@ -73,7 +73,6 @@ function PageRow({ doc }: { doc: SidebarDoc }) {
     <li>
       <Link
         href={`/doc/${doc.id}`}
-        prefetch={false}
         className="group flex items-center gap-3 rounded-md px-2 py-2 text-sm transition-colors hover:bg-muted/60"
       >
         {doc.icon ? (

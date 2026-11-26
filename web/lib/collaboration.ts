@@ -65,6 +65,10 @@ export function replaceDocumentFragment(target: Y.Doc, state: string) {
   }
 }
 
+export function hasOpenSession(documentId: string) {
+  return sessions.has(documentId);
+}
+
 export function openSession(
   documentId: string,
   bootstrap: CollabBootstrap,

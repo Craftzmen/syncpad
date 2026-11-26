@@ -7,7 +7,7 @@ import { auth } from "@/auth";
 import { DocWorkspace } from "@/components/DocWorkspace";
 import EditorPage from "@/components/EditorPage";
 import { requireDb } from "@/db";
-import { documentMembers, documents, yjsDocumentState } from "@/db/schema";
+import { documentMembers, documents } from "@/db/schema";
 import { signCollabToken } from "@/lib/collab-token";
 import { getRoleFromShareToken } from "@/lib/permissions";
 import { and, eq } from "drizzle-orm";
@@ -28,8 +28,8 @@ export default async function DocumentPage({ params }: PageProps) {
     .limit(1);
 
   if (!doc) {
-    for (let attempt = 0; attempt < 8 && !doc; attempt += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 100));
+    for (let attempt = 0; attempt < 3 && !doc; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 40));
       const [again] = await database
         .select()
         .from(documents)
@@ -76,11 +76,6 @@ export default async function DocumentPage({ params }: PageProps) {
   }
 
   const canEdit = role === "edit";
-  const [stateRow] = await database
-    .select({ state: yjsDocumentState.state })
-    .from(yjsDocumentState)
-    .where(eq(yjsDocumentState.documentId, id))
-    .limit(1);
   const viewerId = session?.user?.id ?? `guest:${shareToken ?? "anon"}`;
   const viewerName = session?.user?.name ?? (role === "view" ? "Viewer" : "Guest");
   let collabToken = "";
@@ -120,7 +115,6 @@ export default async function DocumentPage({ params }: PageProps) {
         userId={viewerId}
         name={viewerName}
         image={session?.user?.image ?? null}
-        initialState={stateRow?.state ?? null}
       />
     </DocWorkspace>
   );

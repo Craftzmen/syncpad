@@ -10,6 +10,21 @@ import { mergeYjsStates } from "@/lib/yjs-state";
 
 type Params = { params: Promise<{ id: string }> };
 
+export async function GET(_request: Request, { params }: Params) {
+  const { id } = await params;
+  const session = await auth();
+  const role = await editorRole(session?.user?.id ?? null, id);
+  if (!role) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+  const [row] = await requireDb()
+    .select({ state: yjsDocumentState.state })
+    .from(yjsDocumentState)
+    .where(eq(yjsDocumentState.documentId, id))
+    .limit(1);
+  return NextResponse.json({ state: row?.state ?? null });
+}
+
 export async function PUT(request: Request, { params }: Params) {
   const { id } = await params;
   const session = await auth();

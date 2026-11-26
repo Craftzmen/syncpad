@@ -49,6 +49,7 @@ import type { CollabRole } from "@/lib/collab-token";
 import { EditorBodySkeleton } from "@/components/page-skeletons";
 import {
   encodeDocumentState,
+  hasOpenSession,
   openSession,
   refreshCollabToken,
   replaceDocumentFragment,
@@ -596,12 +597,56 @@ export default function Editor({
   initialState?: string | null;
 }) {
   const [session, setSession] = useState<CollabSession | null>(null);
+  const [noteReady, setNoteReady] = useState(false);
 
   useLayoutEffect(() => {
-    setSession(openSession(docId, { token, role, userId, name, image }, initialState));
+    let cancelled = false;
+    setNoteReady(false);
+    const bootstrap = { token, role, userId, name, image };
+    const alreadyOpen = hasOpenSession(docId);
+    const current = openSession(docId, bootstrap, initialState);
+    setSession(current);
+    let shown = false;
+    const ready = () => {
+      shown = true;
+      if (!cancelled) setNoteReady(true);
+    };
+    if (alreadyOpen && current.ydoc.getXmlFragment("default").length > 0) {
+      ready();
+    }
+    const provider = current.provider;
+    if (provider) {
+      if (provider.synced) ready();
+      provider.on("synced", ready);
+    }
+    const loadSavedNote = async () => {
+      if (shown) return;
+      if (initialState) {
+        ready();
+        return;
+      }
+      try {
+        const response = await fetch(`/api/documents/${docId}/state`, { cache: "no-store" });
+        if (!response.ok) return;
+        const body = (await response.json()) as { state?: string | null };
+        if (cancelled || !body.state) return;
+        openSession(docId, bootstrap, body.state);
+        ready();
+      } catch {
+        ready();
+      }
+    };
+    const backup = window.setTimeout(() => {
+      void loadSavedNote();
+    }, provider ? 800 : 0);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(backup);
+      provider?.off("synced", ready);
+    };
   }, [docId, token, role, userId, name, image, initialState]);
 
-  if (!session) {
+  if (!session || !noteReady) {
     return <EditorBodySkeleton />;
   }
 

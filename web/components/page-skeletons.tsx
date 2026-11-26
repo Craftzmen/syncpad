@@ -87,13 +87,10 @@ export function DocumentPageSkeleton() {
         <Skeleton className="ml-auto h-7 w-16 rounded-md bg-[#f1f1ef]" />
         <Skeleton className="size-7 rounded-md bg-[#f1f1ef]" />
       </div>
-      <div className="min-h-0 flex-1 overflow-hidden">
-        <Skeleton className="h-[30vh] min-h-[180px] w-full rounded-none bg-[#f1f1ef]" />
-        <div className="px-12 pt-8 sm:px-16">
-          <Skeleton className="h-10 w-64 bg-[#f1f1ef]" />
-          <div className="mt-8">
-            <EditorBodySkeleton />
-          </div>
+      <div className="min-h-0 flex-1 overflow-hidden px-12 pt-16 sm:px-16">
+        <Skeleton className="h-10 w-64 bg-[#f1f1ef]" />
+        <div className="mt-8">
+          <EditorBodySkeleton />
         </div>
       </div>
     </div>

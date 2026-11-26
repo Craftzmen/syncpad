@@ -252,7 +252,6 @@ export function AppSidebar({
           <div className="shrink-0 border-t border-black/[0.06] p-2">
             <Link
               href="/dashboard/trash"
-              prefetch={false}
               className={cn(
                 "flex h-9 items-center gap-2.5 rounded-lg px-2.5 text-[14px]",
                 pathname === "/dashboard/trash"
@@ -292,7 +291,7 @@ function RailButton({
   const glyph = <Icon className="size-[18px]" strokeWidth={1.75} />;
   if (href) {
     return (
-      <Link href={href} prefetch={false} title={label} className={className}>
+      <Link href={href} title={label} className={className}>
         {glyph}
       </Link>
     );
@@ -462,7 +461,6 @@ function PageLink({
       ) : (
         <Link
           href={`/doc/${doc.id}`}
-          prefetch={false}
           className={cn(
             "flex h-9 min-w-0 items-center gap-2.5 rounded-lg px-2.5 pr-8 text-[14px] text-[#0d0d0d] transition-colors duration-150",
             active || menuOpen

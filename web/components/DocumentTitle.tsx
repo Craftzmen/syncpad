@@ -7,74 +7,51 @@ import { isGhostTitle } from "@/lib/page-title";
 import { cn } from "@/lib/utils";
 
 export function DocumentTitle({
-  documentId,
-  initialTitle,
+  title,
   canEdit,
-  onTitleChange,
+  onChange,
+  onFlush,
 }: {
-  documentId: string;
-  initialTitle: string;
+  title: string;
   canEdit: boolean;
-  onTitleChange?: (title: string) => void;
+  onChange: (title: string) => void;
+  onFlush: () => void;
 }) {
-  const [title, setTitle] = useState(initialTitle);
   const [focused, setFocused] = useState(false);
+  const ghost = isGhostTitle(title) && !focused;
 
   useEffect(() => {
-    setTitle(initialTitle);
-  }, [initialTitle]);
-
-  useEffect(() => {
-    publishPageTitle(isGhostTitle(title) && !focused ? "" : title);
-  }, [focused, title]);
+    publishPageTitle(ghost ? "" : title);
+  }, [ghost, title]);
 
   useEffect(() => {
     const onClear = () => {
       if (!canEdit) return;
-      setTitle("New page");
-      onTitleChange?.("New page");
-      void fetch(`/api/documents/${documentId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: "New page" }),
-      });
+      onChange("New page");
+      onFlush();
     };
     window.addEventListener("syncpad:clear-title", onClear);
     return () => window.removeEventListener("syncpad:clear-title", onClear);
-  }, [canEdit, documentId, onTitleChange]);
-
-  const ghost = isGhostTitle(title) && !focused;
-
-  async function save(next: string) {
-    if (!canEdit) return;
-    const trimmed = next.trim();
-    const stored = trimmed && !isGhostTitle(trimmed) ? trimmed : "New page";
-    setTitle(stored);
-    onTitleChange?.(stored);
-    await fetch(`/api/documents/${documentId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: stored }),
-    });
-  }
+  }, [canEdit, onChange, onFlush]);
 
   return (
     <input
-      value={ghost ? "" : isGhostTitle(title) ? "" : title}
+      value={ghost || isGhostTitle(title) ? "" : title}
       readOnly={!canEdit}
       onFocus={() => setFocused(true)}
       onChange={(event) => {
-        setTitle(event.target.value);
-        onTitleChange?.(event.target.value || "New page");
+        if (!canEdit) return;
+        onChange(event.target.value);
       }}
       onKeyDown={(event) => {
         if (event.key !== "Enter" || !canEdit || event.nativeEvent.isComposing) return;
         event.preventDefault();
+        onFlush();
         requestTitleEnter();
       }}
       onBlur={() => {
         setFocused(false);
-        void save(title);
+        if (canEdit) onFlush();
       }}
       placeholder="New page"
       className={cn(

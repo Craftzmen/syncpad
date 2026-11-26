@@ -54,6 +54,7 @@ import {
   replaceDocumentFragment,
   type CollabSession,
 } from "@/lib/collaboration";
+import { persistDocumentState } from "@/lib/document-save";
 import { localChangesMissing, patchLiveBinding, pushEditorToYjs } from "@/lib/sync-editor";
 import { colorFromId } from "@/lib/user-color";
 import type { SlashCommandItem } from "@/components/editor/slash-extension";
@@ -326,8 +327,8 @@ function CollabEditor({ docId, session }: InnerProps) {
   const editor = useEditor(
     {
       immediatelyRender: true,
-      editable: role === "edit" && session.provider != null,
-      autofocus: role === "edit" && session.provider != null ? "end" : false,
+      editable: role === "edit",
+      autofocus: role === "edit" ? "end" : false,
       extensions,
       editorProps: {
         attributes: {
@@ -444,46 +445,57 @@ function CollabEditor({ docId, session }: InnerProps) {
   }, [editor, role, session.ydoc]);
 
   useLayoutEffect(() => {
+    if (!editor || role !== "edit") return;
     const provider = session.provider;
-    if (!editor || role !== "edit" || !provider) return;
-    patchLiveBinding(editor);
-    let syncTimer = 0;
-    let edited = false;
-    const save = () => {
-      if (editor.isDestroyed) return;
-      if (!pushEditorToYjs(editor, session.ydoc)) return;
-      edited = true;
-      window.clearTimeout(syncTimer);
-      syncTimer = window.setTimeout(() => provider.forceSync(), 300);
+    if (provider) patchLiveBinding(editor);
+    let timer = 0;
+    let dirty = false;
+    const flush = () => {
+      if (!dirty || editor.isDestroyed) return;
+      dirty = false;
+      window.clearTimeout(timer);
+      try {
+        pushEditorToYjs(editor, session.ydoc);
+        persistDocumentState(docId, encodeDocumentState(session.ydoc));
+      } catch (error) {
+        console.error("Could not save the document", error);
+      }
+      if (provider?.synced) provider.forceSync();
+    };
+    const schedule = () => {
+      dirty = true;
+      window.clearTimeout(timer);
+      timer = window.setTimeout(flush, 200);
     };
     const saveIfAhead = () => {
-      if (!provider.synced || editor.isDestroyed) return;
+      if (!provider?.synced || editor.isDestroyed) return;
       if (!localChangesMissing(editor, session.ydoc)) return;
-      save();
+      dirty = true;
+      flush();
     };
     saveIfAhead();
-    provider.on("synced", saveIfAhead);
+    provider?.on("synced", saveIfAhead);
     const onUpdate = ({ transaction }: { transaction: Transaction }) => {
       if (!transaction.docChanged) return;
       const meta = transaction.getMeta(ySyncPluginKey) as { isChangeOrigin?: boolean } | undefined;
       if (meta?.isChangeOrigin) return;
-      edited = true;
-      save();
+      schedule();
     };
-    const flush = () => {
-      if (!edited || editor.isDestroyed) return;
-      if (pushEditorToYjs(editor, session.ydoc)) provider.forceSync();
+    const onHide = () => {
+      if (document.visibilityState === "hidden") flush();
     };
     editor.on("update", onUpdate);
     window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", onHide);
     return () => {
       flush();
-      provider.off("synced", saveIfAhead);
+      provider?.off("synced", saveIfAhead);
       editor.off("update", onUpdate);
       window.removeEventListener("pagehide", flush);
-      window.clearTimeout(syncTimer);
+      document.removeEventListener("visibilitychange", onHide);
+      window.clearTimeout(timer);
     };
-  }, [editor, role, session]);
+  }, [docId, editor, role, session]);
 
   useEffect(() => {
     const provider = session.provider;
@@ -518,7 +530,7 @@ function CollabEditor({ docId, session }: InnerProps) {
   }, [docId, role, session]);
 
   useEffect(() => {
-    if (!editor || role !== "edit" || !session.provider) return;
+    if (!editor || role !== "edit") return;
     const onInsert = (event: Event) => {
       consumePendingInsert();
       applyInsert(editor, (event as CustomEvent<InsertKind>).detail);

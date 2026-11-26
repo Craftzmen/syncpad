@@ -4,6 +4,8 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { requireDb } from "@/db";
 import { documents } from "@/db/schema";
+import { editorRole } from "@/lib/editor-role";
+import { canonicalTitle } from "@/lib/page-title";
 import { getDocumentRole, invalidateDocumentList } from "@/lib/permissions";
 
 type Params = { params: Promise<{ id: string }> };
@@ -34,7 +36,7 @@ export async function PATCH(request: Request, { params }: Params) {
   const { id } = await params;
   const database = requireDb();
   const session = await auth();
-  const role = await getDocumentRole(session?.user?.id ?? null, id);
+  const role = await editorRole(session?.user?.id ?? null, id);
   if (role !== "edit") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
@@ -53,7 +55,7 @@ export async function PATCH(request: Request, { params }: Params) {
   };
 
   if (body.title !== undefined) {
-    updates.title = body.title.trim() || "Untitled";
+    updates.title = canonicalTitle(body.title);
   }
   if (body.icon !== undefined) {
     updates.icon = body.icon;

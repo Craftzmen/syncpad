@@ -1,4 +1,5 @@
 import { neon } from "@neondatabase/serverless";
+import * as Y from "yjs";
 
 function sql() {
   if (!process.env.DATABASE_URL) {
@@ -30,7 +31,19 @@ export async function saveYjsState(documentId, update) {
   if (!db) {
     return;
   }
-  const state = Buffer.from(update).toString("base64");
+  let bytes = update;
+  const existing = await loadYjsState(documentId);
+  if (existing?.length) {
+    const doc = new Y.Doc();
+    try {
+      Y.applyUpdate(doc, existing);
+      Y.applyUpdate(doc, update);
+      bytes = Y.encodeStateAsUpdate(doc);
+    } finally {
+      doc.destroy();
+    }
+  }
+  const state = Buffer.from(bytes).toString("base64");
   await db`
   INSERT INTO yjs_document_state (document_id, state, updated_at)
   VALUES (${documentId}::uuid, ${state}, NOW())

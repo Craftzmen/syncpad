@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Copy,
   Ellipsis,
@@ -36,7 +36,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { displayPageTitle } from "@/lib/page-title";
+import { saveDocumentTitle } from "@/lib/document-save";
+import { canonicalTitle, displayPageTitle } from "@/lib/page-title";
 import { cn } from "@/lib/utils";
 
 const COLLAPSED_KEY = "syncpad-sidebar-collapsed";
@@ -335,16 +336,41 @@ function PageLink({
   const [menuOpen, setMenuOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [name, setName] = useState(doc.title);
+  const nameTimer = useRef(0);
+  const nameOrigin = useRef(doc.title);
+  const skipBlur = useRef(false);
 
-  async function saveName() {
-    const title = name.trim() || "New page";
+  useEffect(() => {
+    if (!renaming) setName(doc.title);
+  }, [doc.title, renaming]);
+
+  useEffect(() => {
+    return () => window.clearTimeout(nameTimer.current);
+  }, []);
+
+  function publishName(value: string) {
+    const title = canonicalTitle(value);
+    workspace?.patchDoc(doc.id, { title });
+    window.clearTimeout(nameTimer.current);
+    nameTimer.current = window.setTimeout(() => saveDocumentTitle(doc.id, title), 200);
+  }
+
+  function commitName(value: string) {
+    window.clearTimeout(nameTimer.current);
+    const title = canonicalTitle(value);
     setRenaming(false);
     workspace?.patchDoc(doc.id, { title });
-    await fetch(`/api/documents/${doc.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title }),
-    });
+    saveDocumentTitle(doc.id, title);
+  }
+
+  function cancelName() {
+    skipBlur.current = true;
+    window.clearTimeout(nameTimer.current);
+    const title = nameOrigin.current;
+    setName(title);
+    setRenaming(false);
+    workspace?.patchDoc(doc.id, { title: canonicalTitle(title) });
+    saveDocumentTitle(doc.id, title);
   }
 
   async function toggleFavorite() {
@@ -396,11 +422,24 @@ function PageLink({
         <input
           autoFocus
           value={name}
-          onChange={(event) => setName(event.target.value)}
-          onBlur={() => void saveName()}
+          onChange={(event) => {
+            setName(event.target.value);
+            publishName(event.target.value);
+          }}
+          onBlur={() => {
+            if (skipBlur.current) {
+              skipBlur.current = false;
+              return;
+            }
+            commitName(name);
+          }}
           onKeyDown={(event) => {
-            if (event.key === "Enter") void saveName();
-            if (event.key === "Escape") setRenaming(false);
+            if (event.key === "Enter") {
+              event.preventDefault();
+              skipBlur.current = true;
+              commitName(name);
+            }
+            if (event.key === "Escape") cancelName();
           }}
           className="h-9 w-full rounded-lg bg-white px-2.5 text-[14px] shadow-[0_0_0_1px_rgba(0,0,0,0.06)] outline-none"
         />
@@ -471,6 +510,7 @@ function PageLink({
                 icon={Pencil}
                 label="Rename"
                 onClick={() => {
+                  nameOrigin.current = doc.title;
                   setName(doc.title);
                   setRenaming(true);
                   setMenuOpen(false);

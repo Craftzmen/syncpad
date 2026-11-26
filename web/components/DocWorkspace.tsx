@@ -21,6 +21,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { resolveCover } from "@/lib/covers";
+import { saveDocumentTitle } from "@/lib/document-save";
+import { canonicalTitle } from "@/lib/page-title";
 import { cn } from "@/lib/utils";
 
 type AccessOwner = {
@@ -116,6 +118,8 @@ export function DocWorkspace({
   const workspace = useWorkspace();
   const [restoring, setRestoring] = useState(false);
   const [title, setTitle] = useState(initialTitle);
+  const titleRef = useRef(initialTitle);
+  const titleTimer = useRef(0);
   const [icon, setIcon] = useState<string | null>(initialIcon);
   const [coverColor, setCoverColor] = useState<string | null>(initialCoverColor);
   const [favoriteFallback, setFavoriteFallback] = useState(initialFavorite);
@@ -123,6 +127,23 @@ export function DocWorkspace({
   const [pinnedFallback, setPinnedFallback] = useState(initialPinned);
   const [pinLoading, setPinLoading] = useState(false);
   const listed = workspace?.docs.find((doc) => doc.id === documentId);
+
+  function applyTitle(next: string) {
+    titleRef.current = next;
+    setTitle(next);
+    workspace?.patchDoc(documentId, { title: canonicalTitle(next) });
+    if (!canEdit) return;
+    window.clearTimeout(titleTimer.current);
+    titleTimer.current = window.setTimeout(() => {
+      saveDocumentTitle(documentId, titleRef.current);
+    }, 200);
+  }
+
+  function flushTitle() {
+    window.clearTimeout(titleTimer.current);
+    if (!canEdit) return;
+    saveDocumentTitle(documentId, titleRef.current);
+  }
   const isFavorite = listed ? Boolean(listed.isFavorite) : favoriteFallback;
   const isPinned = listed ? Boolean(listed.isPinned) : pinnedFallback;
   const [commentsOpen, setCommentsOpen] = useState(false);
@@ -153,6 +174,26 @@ export function DocWorkspace({
     };
   }, []);
 
+  useEffect(() => {
+    const listedTitle = listed?.title;
+    if (!listedTitle || canonicalTitle(titleRef.current) === listedTitle) return;
+    titleRef.current = listedTitle;
+    setTitle(listedTitle);
+  }, [listed?.title]);
+
+  useEffect(() => {
+    const onHide = () => {
+      if (document.visibilityState === "hidden") flushTitle();
+    };
+    window.addEventListener("pagehide", flushTitle);
+    document.addEventListener("visibilitychange", onHide);
+    return () => {
+      flushTitle();
+      window.removeEventListener("pagehide", flushTitle);
+      document.removeEventListener("visibilitychange", onHide);
+    };
+  }, [canEdit, documentId]);
+
   const loadAccess = useCallback(async () => {
     const res = await fetch(`/api/documents/${documentId}/access`);
     if (!res.ok) {
@@ -182,6 +223,17 @@ export function DocWorkspace({
     window.addEventListener("syncpad:empty", onEmpty);
     return () => window.removeEventListener("syncpad:empty", onEmpty);
   }, []);
+
+  function updateIcon(next: string | null) {
+    const previous = icon;
+    setIcon(next);
+    workspace?.patchDoc(documentId, { icon: next });
+    void patchMeta({ icon: next }).then((ok) => {
+      if (ok) return;
+      setIcon(previous);
+      workspace?.patchDoc(documentId, { icon: previous });
+    });
+  }
 
   const patchMeta = useCallback(
     async (patch: Record<string, unknown>) => {
@@ -421,8 +473,11 @@ export function DocWorkspace({
                     align="end"
                     triggerClassName="cover-action"
                     onChange={(next) => {
+                      const previous = coverColor;
                       setCoverColor(next);
-                      void patchMeta({ coverColor: next });
+                      void patchMeta({ coverColor: next }).then((ok) => {
+                        if (!ok) setCoverColor(previous);
+                      });
                     }}
                   />
                 </div>
@@ -442,10 +497,7 @@ export function DocWorkspace({
                   {canEdit ? (
                     <IconPicker
                       icon={icon}
-                      onChange={(next) => {
-                        setIcon(next);
-                        void patchMeta({ icon: next });
-                      }}
+                      onChange={(next) => updateIcon(next)}
                       trigger={
                         <button
                           type="button"
@@ -469,10 +521,7 @@ export function DocWorkspace({
                     {!icon ? (
                       <IconPicker
                         icon={icon}
-                        onChange={(next) => {
-                          setIcon(next);
-                          void patchMeta({ icon: next });
-                        }}
+                        onChange={(next) => updateIcon(next)}
                         trigger={
                           <button type="button" className="cover-action">
                             <SmilePlus />
@@ -488,8 +537,11 @@ export function DocWorkspace({
                         align="start"
                         triggerClassName="cover-action"
                         onChange={(next) => {
+                          const previous = coverColor;
                           setCoverColor(next);
-                          void patchMeta({ coverColor: next });
+                          void patchMeta({ coverColor: next }).then((ok) => {
+                            if (!ok) setCoverColor(previous);
+                          });
                         }}
                       />
                     ) : null}
@@ -511,10 +563,10 @@ export function DocWorkspace({
               ) : null}
 
               <DocumentTitle
-                documentId={documentId}
-                initialTitle={initialTitle}
+                title={title}
                 canEdit={canEdit}
-                onTitleChange={setTitle}
+                onChange={applyTitle}
+                onFlush={flushTitle}
               />
             </div>
 

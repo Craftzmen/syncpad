@@ -38,15 +38,25 @@ export async function POST(request: Request, { params }: Params) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const body = (await request.json()) as { label?: string };
+  const body = (await request.json().catch(() => ({}))) as {
+    label?: string;
+    state?: string;
+  };
   const database = requireDb();
-  const [stateRow] = await database
-    .select({ state: yjsDocumentState.state })
-    .from(yjsDocumentState)
-    .where(eq(yjsDocumentState.documentId, id))
-    .limit(1);
+  let state = typeof body.state === "string" ? body.state.replace(/\s/g, "") : "";
+  if (state && (state.length > 12_000_000 || !/^[A-Za-z0-9+/=]+$/.test(state))) {
+    return NextResponse.json({ error: "Invalid version" }, { status: 400 });
+  }
+  if (!state) {
+    const [stateRow] = await database
+      .select({ state: yjsDocumentState.state })
+      .from(yjsDocumentState)
+      .where(eq(yjsDocumentState.documentId, id))
+      .limit(1);
+    state = stateRow?.state ?? "";
+  }
 
-  if (!stateRow?.state) {
+  if (!state) {
     return NextResponse.json({ error: "No content" }, { status: 400 });
   }
 
@@ -54,11 +64,15 @@ export async function POST(request: Request, { params }: Params) {
     .insert(documentSnapshots)
     .values({
       documentId: id,
-      state: stateRow.state,
-      label: body.label ?? "Snapshot",
+      state,
+      label: body.label?.trim() || "Snapshot",
       createdById: session?.user?.id,
     })
-    .returning();
+    .returning({
+      id: documentSnapshots.id,
+      label: documentSnapshots.label,
+      createdAt: documentSnapshots.createdAt,
+    });
 
   return NextResponse.json(snap, { status: 201 });
 }

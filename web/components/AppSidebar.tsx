@@ -12,6 +12,7 @@ import {
   LogOut,
   PanelLeft,
   Pencil,
+  Pin,
   Search,
   Settings,
   SquarePen,
@@ -45,11 +46,13 @@ export function AppSidebar({
   userName,
   userImage,
   onSearch,
+  creating = false,
 }: {
   documents: SidebarDoc[];
   userName?: string | null;
   userImage?: string | null;
   onSearch?: () => void;
+  creating?: boolean;
 }) {
   const pathname = usePathname();
   const createDoc = useCreateDoc();
@@ -70,8 +73,8 @@ export function AppSidebar({
   }
 
   const initial = (userName?.trim()?.[0] ?? "S").toUpperCase();
-  const favorites = documents.filter((doc) => doc.isFavorite);
-  const privatePages = documents.filter((doc) => !doc.isFavorite);
+  const favorites = documents.filter((doc) => doc.isPinned);
+  const privatePages = documents.filter((doc) => !doc.isPinned);
   const pinned = pinnedOpen ? favorites : favorites.slice(0, 6);
 
   return (
@@ -101,7 +104,12 @@ export function AppSidebar({
           {collapsed ? (
             <RailButton icon={PanelLeft} label="Open sidebar" onClick={toggleCollapsed} />
           ) : null}
-          <RailButton icon={SquarePen} label="New page" onClick={createDoc} />
+          <RailButton
+            icon={SquarePen}
+            label={creating ? "Creating page" : "New page"}
+            onClick={createDoc}
+            disabled={creating}
+          />
           <RailButton icon={Search} label="Search" onClick={onSearch} />
           <RailButton
             icon={Home}
@@ -115,6 +123,14 @@ export function AppSidebar({
             href="/settings"
             active={onSettings}
           />
+          {collapsed ? (
+            <RailButton
+              icon={Trash2}
+              label="Trash"
+              href="/dashboard/trash"
+              active={pathname === "/dashboard/trash"}
+            />
+          ) : null}
         </div>
 
         <div className="mt-auto flex w-full justify-center pb-3">
@@ -183,10 +199,11 @@ export function AppSidebar({
           <button
             type="button"
             onClick={createDoc}
-            className="mx-2 flex h-9 items-center gap-2.5 rounded-lg px-2.5 text-left text-[14px] hover:bg-black/[0.04]"
+            disabled={creating}
+            className="mx-2 flex h-9 items-center gap-2.5 rounded-lg px-2.5 text-left text-[14px] hover:bg-black/[0.04] disabled:opacity-50"
           >
             <SquarePen className="size-4 text-[#0d0d0d]/80" strokeWidth={1.75} />
-            New page
+            {creating ? "Creating…" : "New page"}
           </button>
 
           <nav className="mt-3 min-h-0 flex-1 overflow-x-clip overflow-y-auto overscroll-contain px-2 pb-3">
@@ -231,6 +248,21 @@ export function AppSidebar({
               ) : null}
             </section>
           </nav>
+          <div className="shrink-0 border-t border-black/[0.06] p-2">
+            <Link
+              href="/dashboard/trash"
+              prefetch={false}
+              className={cn(
+                "flex h-9 items-center gap-2.5 rounded-lg px-2.5 text-[14px]",
+                pathname === "/dashboard/trash"
+                  ? "bg-[#e4e4e4] font-medium"
+                  : "hover:bg-black/[0.04]",
+              )}
+            >
+              <Trash2 className="size-4 text-[#8e8e8e]" strokeWidth={1.75} />
+              Trash
+            </Link>
+          </div>
         </div>
       )}
     </aside>
@@ -243,15 +275,17 @@ function RailButton({
   active,
   href,
   onClick,
+  disabled,
 }: {
   icon: typeof Search;
   label: string;
   active?: boolean;
   href?: string;
   onClick?: () => void;
+  disabled?: boolean;
 }) {
   const className = cn(
-    "flex size-8 items-center justify-center rounded-lg text-[#0d0d0d]/75 hover:bg-black/[0.04]",
+    "flex size-8 items-center justify-center rounded-lg text-[#0d0d0d]/75 hover:bg-black/[0.04] disabled:opacity-40",
     active && "bg-black/[0.06]",
   );
   const glyph = <Icon className="size-[18px]" strokeWidth={1.75} />;
@@ -263,7 +297,7 @@ function RailButton({
     );
   }
   return (
-    <button type="button" title={label} onClick={onClick} className={className}>
+    <button type="button" title={label} onClick={onClick} disabled={disabled} className={className}>
       {glyph}
     </button>
   );
@@ -317,11 +351,24 @@ function PageLink({
     const isFavorite = !doc.isFavorite;
     workspace?.patchDoc(doc.id, { isFavorite });
     setMenuOpen(false);
-    await fetch(`/api/documents/${doc.id}`, {
+    const res = await fetch(`/api/documents/${doc.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ isFavorite }),
     });
+    if (!res.ok) workspace?.patchDoc(doc.id, { isFavorite: doc.isFavorite });
+  }
+
+  async function togglePin() {
+    const isPinned = !doc.isPinned;
+    workspace?.patchDoc(doc.id, { isPinned });
+    setMenuOpen(false);
+    const res = await fetch(`/api/documents/${doc.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isPinned }),
+    });
+    if (!res.ok) workspace?.patchDoc(doc.id, { isPinned: doc.isPinned });
   }
 
   async function duplicate() {
@@ -334,11 +381,11 @@ function PageLink({
   }
 
   async function moveToTrash() {
-    const res = await fetch(`/api/documents/${doc.id}`, { method: "DELETE" });
     setMenuOpen(false);
-    if (!res.ok) return;
     workspace?.forgetDoc(doc.id);
     if (pathname === `/doc/${doc.id}`) router.push("/dashboard");
+    const res = await fetch(`/api/documents/${doc.id}`, { method: "DELETE" });
+    if (!res.ok) workspace?.rememberDoc(doc);
   }
 
   const edited = doc.updatedAt ? new Date(doc.updatedAt) : null;
@@ -376,6 +423,9 @@ function PageLink({
             <FileText className="size-4 shrink-0 text-[#8e8e8e]" strokeWidth={1.75} />
           )}
           <span className="truncate">{displayPageTitle(doc.title)}</span>
+          {doc.isFavorite ? (
+            <Star className="ml-auto size-3 shrink-0 fill-amber-400 text-amber-500" />
+          ) : null}
         </Link>
       )}
       <Popover open={menuOpen} onOpenChange={setMenuOpen}>
@@ -397,8 +447,13 @@ function PageLink({
             <div className="p-1">
               <NotionMenuLabel>Page</NotionMenuLabel>
               <NotionMenuItem
+                icon={Pin}
+                label={doc.isPinned ? "Unpin page" : "Pin page"}
+                onClick={() => void togglePin()}
+              />
+              <NotionMenuItem
                 icon={Star}
-                label={doc.isFavorite ? "Remove from Pinned" : "Pin page"}
+                label={doc.isFavorite ? "Remove from favorites" : "Add to favorites"}
                 onClick={() => void toggleFavorite()}
               />
               <NotionMenuItem

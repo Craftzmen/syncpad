@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { requestTitleEnter } from "@/lib/editor-events";
+import { publishPageTitle, requestTitleEnter } from "@/lib/editor-events";
 import { isGhostTitle } from "@/lib/page-title";
 import { cn } from "@/lib/utils";
 
@@ -23,6 +23,10 @@ export function DocumentTitle({
   useEffect(() => {
     setTitle(initialTitle);
   }, [initialTitle]);
+
+  useEffect(() => {
+    publishPageTitle(isGhostTitle(title) && !focused ? "" : title);
+  }, [focused, title]);
 
   useEffect(() => {
     const onClear = () => {

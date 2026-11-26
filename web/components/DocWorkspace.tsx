@@ -1,13 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { Link2, MessageSquare, SmilePlus } from "lucide-react";
 
 import { CommentPeek, CommentsPanel, usePageComments } from "@/components/CommentsPanel";
+import { useVersionHistory, VersionHistoryDrawer } from "@/components/VersionHistory";
 import { DocTopBar } from "@/components/DocTopBar";
 import { DocumentTitle } from "@/components/DocumentTitle";
 import { CoverPicker } from "@/components/CoverPicker";
 import { PageIconView } from "@/components/PageIconView";
+import { useWorkspace } from "@/components/WorkspaceShell";
 import { GetStarted, IconPicker } from "@/components/PageChrome";
 import {
   Dialog,
@@ -82,6 +85,7 @@ export function DocWorkspace({
   initialIcon,
   initialCoverColor,
   initialFavorite,
+  initialPinned = false,
   updatedAt,
   editedBy,
   canEdit,
@@ -89,6 +93,7 @@ export function DocWorkspace({
   viewerName,
   viewerImage,
   collabError = null,
+  trashed = false,
   children,
 }: {
   documentId: string;
@@ -96,6 +101,7 @@ export function DocWorkspace({
   initialIcon: string | null;
   initialCoverColor: string | null;
   initialFavorite: boolean;
+  initialPinned?: boolean;
   updatedAt?: string | null;
   editedBy?: string | null;
   canEdit: boolean;
@@ -103,14 +109,25 @@ export function DocWorkspace({
   viewerName?: string | null;
   viewerImage?: string | null;
   collabError?: string | null;
+  trashed?: boolean;
   children: ReactNode;
 }) {
+  const router = useRouter();
+  const workspace = useWorkspace();
+  const [restoring, setRestoring] = useState(false);
   const [title, setTitle] = useState(initialTitle);
   const [icon, setIcon] = useState<string | null>(initialIcon);
   const [coverColor, setCoverColor] = useState<string | null>(initialCoverColor);
-  const [isFavorite, setIsFavorite] = useState(initialFavorite);
+  const [favoriteFallback, setFavoriteFallback] = useState(initialFavorite);
   const [favoriteLoading, setFavoriteLoading] = useState(false);
+  const [pinnedFallback, setPinnedFallback] = useState(initialPinned);
+  const [pinLoading, setPinLoading] = useState(false);
+  const listed = workspace?.docs.find((doc) => doc.id === documentId);
+  const isFavorite = listed ? Boolean(listed.isFavorite) : favoriteFallback;
+  const isPinned = listed ? Boolean(listed.isPinned) : pinnedFallback;
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const versions = useVersionHistory(documentId);
   const [shareOpen, setShareOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [inviteBusy, setInviteBusy] = useState(false);
@@ -168,12 +185,13 @@ export function DocWorkspace({
 
   const patchMeta = useCallback(
     async (patch: Record<string, unknown>) => {
-      if (!canEdit) return;
-      await fetch(`/api/documents/${documentId}`, {
+      if (!canEdit) return false;
+      const res = await fetch(`/api/documents/${documentId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(patch),
       });
+      return res.ok;
     },
     [canEdit, documentId],
   );
@@ -182,9 +200,28 @@ export function DocWorkspace({
     if (!canEdit || favoriteLoading) return;
     const next = !isFavorite;
     setFavoriteLoading(true);
-    setIsFavorite(next);
-    await patchMeta({ isFavorite: next });
+    setFavoriteFallback(next);
+    workspace?.patchDoc(documentId, { isFavorite: next });
+    const ok = await patchMeta({ isFavorite: next });
+    if (!ok) {
+      setFavoriteFallback(!next);
+      workspace?.patchDoc(documentId, { isFavorite: !next });
+    }
     setFavoriteLoading(false);
+  }
+
+  async function togglePin() {
+    if (!canEdit || pinLoading) return;
+    const next = !isPinned;
+    setPinLoading(true);
+    setPinnedFallback(next);
+    workspace?.patchDoc(documentId, { isPinned: next });
+    const ok = await patchMeta({ isPinned: next });
+    if (!ok) {
+      setPinnedFallback(!next);
+      workspace?.patchDoc(documentId, { isPinned: !next });
+    }
+    setPinLoading(false);
   }
 
   function markCopied() {
@@ -270,6 +307,27 @@ export function DocWorkspace({
     if (res.ok) void loadAccess();
   }
 
+  async function restorePage() {
+    if (restoring) return;
+    setRestoring(true);
+    const res = await fetch(`/api/documents/${documentId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ restore: true }),
+    });
+    if (!res.ok) {
+      setRestoring(false);
+      return;
+    }
+    workspace?.rememberDoc({
+      id: documentId,
+      title,
+      icon,
+      isFavorite,
+    });
+    router.refresh();
+  }
+
   const cover = resolveCover(coverColor);
 
   return (
@@ -281,15 +339,48 @@ export function DocWorkspace({
         canEdit={canEdit}
         isFavorite={isFavorite}
         favoriteLoading={favoriteLoading}
+        isPinned={isPinned}
+        pinLoading={pinLoading}
         showComments={showComments}
         commentsOpen={commentsOpen}
         shared={accessMembers.length + accessInvites.length > 0}
         updatedAt={updatedAt}
         editedBy={editedBy}
-        onFavoriteToggle={toggleFavorite}
-        onCommentsToggle={() => setCommentsOpen((value) => !value)}
+        onFavoriteToggle={() => void toggleFavorite()}
+        onPinToggle={() => void togglePin()}
+        onCommentsToggle={() => {
+          setCommentsOpen((value) => !value);
+          setHistoryOpen(false);
+        }}
         onShare={() => setShareOpen(true)}
+        historyOpen={historyOpen}
+        onOpenHistory={() => {
+          setCommentsOpen(false);
+          setHistoryOpen(true);
+          void versions.refresh();
+        }}
+        onSaveVersion={async () => {
+          const ok = await versions.save();
+          if (ok) {
+            setCommentsOpen(false);
+            setHistoryOpen(true);
+          }
+          return ok;
+        }}
       />
+      {trashed ? (
+        <div className="flex items-center justify-between gap-3 border-b border-[#f0d4d2] bg-[#fdf8f7] px-4 py-2">
+          <p className="text-[13px] text-[#6b2c28]">This page is in Trash.</p>
+          <button
+            type="button"
+            onClick={() => void restorePage()}
+            disabled={restoring}
+            className="h-7 shrink-0 rounded-md bg-white px-2.5 text-[13px] font-medium text-[#6b2c28] shadow-[0_0_0_1px_rgba(196,71,66,0.18)] disabled:opacity-50"
+          >
+            {restoring ? "Restoring…" : "Restore"}
+          </button>
+        </div>
+      ) : null}
       {collabError ? (
         <p
           data-collab-error={collabError}
@@ -315,7 +406,10 @@ export function DocWorkspace({
                     <button
                       type="button"
                       className="cover-action"
-                      onClick={() => setCommentsOpen(true)}
+                      onClick={() => {
+                        setHistoryOpen(false);
+                        setCommentsOpen(true);
+                      }}
                     >
                       <MessageSquare />
                       Add comment
@@ -403,7 +497,10 @@ export function DocWorkspace({
                       <button
                         type="button"
                         className="cover-action"
-                        onClick={() => setCommentsOpen(true)}
+                        onClick={() => {
+                        setHistoryOpen(false);
+                        setCommentsOpen(true);
+                      }}
                       >
                         <MessageSquare />
                         Add comment
@@ -432,7 +529,10 @@ export function DocWorkspace({
           <div className="pointer-events-auto">
             <CommentPeek
               comments={pageComments.comments}
-              onOpen={() => setCommentsOpen(true)}
+              onOpen={() => {
+                setHistoryOpen(false);
+                setCommentsOpen(true);
+              }}
             />
           </div>
         </div>
@@ -453,6 +553,23 @@ export function DocWorkspace({
             viewerImage={viewerImage ?? null}
             onAdd={pageComments.addComment}
             onClose={() => setCommentsOpen(false)}
+          />
+        </>
+      ) : null}
+      {historyOpen ? (
+        <>
+          <button
+            type="button"
+            aria-label="Close version history"
+            className="fixed inset-0 z-30 bg-black/10 sm:hidden"
+            onClick={() => setHistoryOpen(false)}
+          />
+          <VersionHistoryDrawer
+            versions={versions.versions}
+            ready={versions.ready}
+            onSave={versions.save}
+            onRestore={versions.restore}
+            onClose={() => setHistoryOpen(false)}
           />
         </>
       ) : null}

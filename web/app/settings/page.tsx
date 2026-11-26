@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 export const dynamic = "force-dynamic";
 
 import { auth } from "@/auth";
+import { AccountSecurity } from "@/components/AccountSecurity";
 import { EmailTestButton } from "@/components/EmailTestButton";
 import { getEmailConfigFromEnv } from "@/lib/email";
 
@@ -64,14 +65,7 @@ export default async function SettingsPage() {
           {emailReady ? <EmailTestButton /> : null}
         </SettingsGroup>
 
-        <SettingsGroup title="Session">
-          <a
-            href="/api/auth/signout"
-            className="flex h-12 items-center px-4 text-sm text-[#d44c47] hover:bg-[#fafafa]"
-          >
-            Log out
-          </a>
-        </SettingsGroup>
+        <AccountSecurity email={email ?? null} name={name} />
       </div>
     </div>
   );

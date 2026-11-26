@@ -1,10 +1,9 @@
 import { Extension } from "@tiptap/core";
 import type { Editor, JSONContent, Range } from "@tiptap/core";
-import { isValidYoutubeUrl } from "@tiptap/extension-youtube";
 import Suggestion from "@tiptap/suggestion";
 
 import { insertMermaid } from "@/components/editor/blocks";
-import { askImage, askText } from "@/components/editor/editor-prompt";
+import { askImage, askText, askVideo } from "@/components/editor/editor-prompt";
 
 export type SlashGroup = "Suggested" | "Basic blocks" | "Media" | "Advanced";
 
@@ -157,9 +156,9 @@ export const defaultSlashItems: SlashCommandItem[] = [
     title: "Image",
     group: "Media",
     command: (editor, range) => {
-      void askImage().then((src) => {
-        if (!src) return;
-        placeContent(editor, range, { type: "image", attrs: { src } }, true);
+      void askImage().then((media) => {
+        if (!media) return;
+        placeContent(editor, range, { type: "image", attrs: { src: media.src } }, true);
       });
     },
   },
@@ -167,18 +166,17 @@ export const defaultSlashItems: SlashCommandItem[] = [
     title: "Video",
     group: "Media",
     command: (editor, range) => {
-      void askText({
-        title: "Add a video",
-        description: "YouTube links embed on the page. Any other link plays as a video file.",
-        placeholder: "https://",
-        confirmLabel: "Insert",
-      }).then((src) => {
-        if (!src) return;
-        if (isValidYoutubeUrl(src)) {
-          placeContent(editor, range, { type: "youtube", attrs: { src } }, true);
-          return;
-        }
-        placeContent(editor, range, { type: "video", attrs: { src } }, true);
+      void askVideo().then((media) => {
+        if (!media) return;
+        placeContent(
+          editor,
+          range,
+          {
+            type: media.embed === "youtube" ? "youtube" : "video",
+            attrs: { src: media.src },
+          },
+          true,
+        );
       });
     },
   },

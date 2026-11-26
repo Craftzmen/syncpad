@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
+  Check,
   ChevronDown,
   Link2,
   Lock,
   MessageSquare,
+  Pin,
   Share,
   Star,
 } from "lucide-react";
@@ -33,14 +35,20 @@ export function DocTopBar({
   canEdit,
   isFavorite,
   favoriteLoading,
+  isPinned,
+  pinLoading,
   showComments,
   commentsOpen,
   shared = false,
   updatedAt,
   editedBy,
   onFavoriteToggle,
+  onPinToggle,
   onCommentsToggle,
   onShare,
+  historyOpen,
+  onOpenHistory,
+  onSaveVersion,
 }: {
   documentId: string;
   title: string;
@@ -48,18 +56,49 @@ export function DocTopBar({
   canEdit: boolean;
   isFavorite: boolean;
   favoriteLoading?: boolean;
+  isPinned: boolean;
+  pinLoading?: boolean;
   showComments: boolean;
   commentsOpen: boolean;
   shared?: boolean;
   updatedAt?: string | null;
   editedBy?: string | null;
   onFavoriteToggle: () => void;
+  onPinToggle: () => void;
   onCommentsToggle: () => void;
   onShare: () => void;
+  historyOpen: boolean;
+  onOpenHistory: () => void;
+  onSaveVersion: () => Promise<boolean>;
 }) {
   const label = displayPageTitle(title);
   const [pageMenu, setPageMenu] = useState(false);
   const [accessMenu, setAccessMenu] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const copiedTimer = useRef(0);
+
+  async function copyLink() {
+    const url = window.location.href;
+    let copiedOk = false;
+    try {
+      await navigator.clipboard.writeText(url);
+      copiedOk = true;
+    } catch {
+      const field = document.createElement("textarea");
+      field.value = url;
+      field.setAttribute("readonly", "");
+      field.style.position = "fixed";
+      field.style.left = "-9999px";
+      document.body.appendChild(field);
+      field.select();
+      copiedOk = document.execCommand("copy");
+      field.remove();
+    }
+    if (!copiedOk) return;
+    setCopied(true);
+    window.clearTimeout(copiedTimer.current);
+    copiedTimer.current = window.setTimeout(() => setCopied(false), 1600);
+  }
 
   return (
     <header className="sticky top-0 z-20 flex h-11 shrink-0 items-center gap-1 bg-white px-2 sm:px-3">
@@ -83,14 +122,24 @@ export function DocTopBar({
               <div className="p-1">
                 <NotionMenuLabel>Page</NotionMenuLabel>
                 <NotionMenuItem
-                  icon={Link2}
-                  label="Copy link"
+                  icon={copied ? Check : Link2}
+                  label={copied ? "Link copied" : "Copy link"}
                   hint="⌘L"
                   onClick={() => {
-                    void navigator.clipboard.writeText(window.location.href);
+                    void copyLink();
                     setPageMenu(false);
                   }}
                 />
+                {canEdit ? (
+                  <NotionMenuItem
+                    icon={Pin}
+                    label={isPinned ? "Unpin page" : "Pin page"}
+                    onClick={() => {
+                      onPinToggle();
+                      setPageMenu(false);
+                    }}
+                  />
+                ) : null}
                 {canEdit ? (
                   <NotionMenuItem
                     icon={Star}
@@ -159,18 +208,39 @@ export function DocTopBar({
           type="button"
           variant="ghost"
           size="icon-sm"
-          title="Copy link"
-          className="text-[#37352f]/70 hover:bg-[#efefef]"
-          onClick={() => void navigator.clipboard.writeText(window.location.href)}
+          title={copied ? "Link copied" : "Copy link"}
+          aria-label={copied ? "Link copied" : "Copy link"}
+          className={cn(
+            "text-[#37352f]/70 hover:bg-[#efefef]",
+            copied && "text-[#1f7a45]",
+          )}
+          onClick={() => void copyLink()}
         >
-          <Link2 className="size-4" />
+          {copied ? <Check className="size-4" /> : <Link2 className="size-4" />}
         </Button>
         {canEdit ? (
           <Button
             type="button"
             variant="ghost"
             size="icon-sm"
+            title={isPinned ? "Unpin page" : "Pin page"}
+            aria-pressed={isPinned}
+            disabled={pinLoading}
+            className="text-[#37352f]/70 hover:bg-[#efefef]"
+            onClick={onPinToggle}
+          >
+            <Pin
+              className={cn("size-4", isPinned && "fill-[#37352f] text-[#37352f]")}
+            />
+          </Button>
+        ) : null}
+        {canEdit ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
             title={isFavorite ? "Remove from favorites" : "Add to favorites"}
+            aria-pressed={isFavorite}
             disabled={favoriteLoading}
             className="text-[#37352f]/70 hover:bg-[#efefef]"
             onClick={onFavoriteToggle}
@@ -203,6 +273,9 @@ export function DocTopBar({
           canEdit={canEdit}
           updatedAt={updatedAt}
           editedBy={editedBy}
+          historyOpen={historyOpen}
+          onOpenHistory={onOpenHistory}
+          onSaveVersion={onSaveVersion}
         />
       </div>
     </header>

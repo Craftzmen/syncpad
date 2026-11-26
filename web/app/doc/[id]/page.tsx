@@ -21,13 +21,26 @@ export default async function DocumentPage({ params }: PageProps) {
   const shareToken = cookieStore.get(`share_${id}`)?.value;
 
   const database = requireDb();
-  const [doc] = await database
+  let [doc] = await database
     .select()
     .from(documents)
     .where(eq(documents.id, id))
     .limit(1);
 
-  if (!doc || doc.deletedAt) {
+  if (!doc) {
+    for (let attempt = 0; attempt < 8 && !doc; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      const [again] = await database
+        .select()
+        .from(documents)
+        .where(eq(documents.id, id))
+        .limit(1);
+      doc = again;
+    }
+  }
+
+  const trashed = Boolean(doc?.deletedAt);
+  if (!doc || (trashed && doc.ownerId !== session?.user?.id)) {
     if (!session?.user) {
       redirect("/login");
     }
@@ -90,6 +103,7 @@ export default async function DocumentPage({ params }: PageProps) {
       initialIcon={doc.icon}
       initialCoverColor={doc.coverColor}
       initialFavorite={doc.isFavorite}
+      initialPinned={doc.isPinned}
       updatedAt={isoTimestamp(doc.updatedAt)}
       editedBy={session?.user?.name}
       canEdit={canEdit}
@@ -97,6 +111,7 @@ export default async function DocumentPage({ params }: PageProps) {
       viewerName={session?.user?.name ?? null}
       viewerImage={session?.user?.image ?? null}
       collabError={collabError}
+      trashed={trashed}
     >
       <EditorPage
         docId={id}

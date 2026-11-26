@@ -37,6 +37,8 @@ export function NotionMenuItem({
   href,
   onClick,
   active,
+  destructive,
+  immediate,
 }: {
   icon: LucideIcon;
   label: string;
@@ -44,14 +46,22 @@ export function NotionMenuItem({
   href?: string;
   onClick?: () => void;
   active?: boolean;
+  destructive?: boolean;
+  immediate?: boolean;
 }) {
   const className = cn(
     "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-[#37352f]",
+    destructive && "text-[#c44742]",
     active ? "bg-[#f1f1ef]" : "hover:bg-[#f1f1ef]",
   );
   const inner = (
     <>
-      <span className="flex size-6 shrink-0 items-center justify-center rounded border border-black/10 bg-white text-[#37352f]/70">
+      <span
+        className={cn(
+          "flex size-6 shrink-0 items-center justify-center rounded border border-black/10 bg-white text-[#37352f]/70",
+          destructive && "border-[#f0d4d2] text-[#c44742]",
+        )}
+      >
         <Icon className="size-3.5" />
       </span>
       <span className="min-w-0 flex-1 truncate font-medium">{label}</span>
@@ -70,7 +80,20 @@ export function NotionMenuItem({
   }
 
   return (
-    <button type="button" className={className} onClick={onClick}>
+    <button
+      type="button"
+      className={className}
+      onPointerDown={
+        immediate
+          ? (event) => {
+              if (event.button !== 0) return;
+              event.preventDefault();
+              onClick?.();
+            }
+          : undefined
+      }
+      onClick={immediate ? undefined : onClick}
+    >
       {inner}
     </button>
   );

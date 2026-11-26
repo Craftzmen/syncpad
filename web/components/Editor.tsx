@@ -9,14 +9,12 @@ import { BubbleMenu } from "@tiptap/react/menus";
 import Collaboration from "@tiptap/extension-collaboration";
 import CollaborationCaret from "@tiptap/extension-collaboration-caret";
 import Highlight from "@tiptap/extension-highlight";
-import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
 import { Mathematics } from "@tiptap/extension-mathematics";
 import Placeholder from "@tiptap/extension-placeholder";
 import { Table, TableRow } from "@tiptap/extension-table";
 import { TaskList } from "@tiptap/extension-task-list";
 import Underline from "@tiptap/extension-underline";
-import Youtube from "@tiptap/extension-youtube";
 import { ySyncPluginKey } from "@tiptap/y-tiptap";
 import StarterKit from "@tiptap/starter-kit";
 import "katex/dist/katex.min.css";
@@ -24,14 +22,13 @@ import "katex/dist/katex.min.css";
 import {
   Bookmark,
   Callout,
-  ImagePaste,
   insertMermaid,
   Mermaid,
   SyncCodeBlock,
   TableOfContents,
   ToggleBlock,
-  Video,
 } from "@/components/editor/blocks";
+import { MediaDrop, NotionImage, NotionYoutube, Video } from "@/components/editor/media";
 import { createSlashExtension } from "@/components/editor/slash-extension";
 import { SelectionWash } from "@/components/editor/SelectionWash";
 import { TableMenu } from "@/components/editor/TableMenu";
@@ -43,12 +40,20 @@ import { PresenceAvatars } from "@/components/PresenceAvatars";
 import { SlashMenu } from "@/components/SlashMenu";
 import {
   consumePendingInsert,
+  deliverDocumentState,
+  deliverPageText,
   emitEditorEmpty,
   type InsertKind,
 } from "@/lib/editor-events";
 import type { CollabRole } from "@/lib/collab-token";
 import { EditorBodySkeleton } from "@/components/page-skeletons";
-import { openSession, refreshCollabToken, type CollabSession } from "@/lib/collaboration";
+import {
+  encodeDocumentState,
+  openSession,
+  refreshCollabToken,
+  replaceDocumentFragment,
+  type CollabSession,
+} from "@/lib/collaboration";
 import { localChangesMissing, patchLiveBinding, pushEditorToYjs } from "@/lib/sync-editor";
 import { colorFromId } from "@/lib/user-color";
 import type { SlashCommandItem } from "@/components/editor/slash-extension";
@@ -136,6 +141,33 @@ function focusTitleLine(editor: TiptapEditor) {
     active.blur();
   }
   editor.view.focus();
+}
+
+function showFormatMenu({
+  editor,
+  view,
+  state,
+  from,
+  to,
+  element,
+}: {
+  editor: TiptapEditor;
+  view: { hasFocus: () => boolean };
+  state: { doc: { textBetween: (from: number, to: number) => string }; selection: { empty: boolean } };
+  from: number;
+  to: number;
+  element: HTMLElement;
+}) {
+  const { selection } = state;
+  if (selection instanceof NodeSelection) {
+    const name = selection.node.type.name;
+    if (name === "image" || name === "video" || name === "youtube") return false;
+  }
+  const isEmptyText = !state.doc.textBetween(from, to).length && selection instanceof TextSelection;
+  const menuHasFocus = element.contains(document.activeElement);
+  const focused = view.hasFocus() || menuHasFocus;
+  if (!focused || selection.empty || isEmptyText || !editor.isEditable) return false;
+  return true;
 }
 
 function applyInsert(editor: TiptapEditor, kind: InsertKind) {
@@ -249,9 +281,9 @@ function CollabEditor({ docId, session }: InnerProps) {
       TableRow,
       NotionTableHeader,
       NotionTableCell,
-      Image.configure({ allowBase64: true }),
-      ImagePaste,
-      Youtube.configure({ nocookie: true, width: 640, height: 360 }),
+      NotionImage.configure({ allowBase64: true }),
+      MediaDrop,
+      NotionYoutube.configure({ nocookie: true }),
       Video,
       Bookmark,
       Callout,
@@ -382,6 +414,35 @@ function CollabEditor({ docId, session }: InnerProps) {
     };
   }, [editor]);
 
+  useEffect(() => {
+    const onState = () => {
+      try {
+        deliverDocumentState(encodeDocumentState(session.ydoc));
+      } catch {
+        deliverDocumentState(null);
+      }
+    };
+    const onText = () => deliverPageText(editor?.getText() ?? "");
+    const onRestore = (event: Event) => {
+      if (role !== "edit") return;
+      const state = (event as CustomEvent<string>).detail;
+      if (!state) return;
+      try {
+        replaceDocumentFragment(session.ydoc, state);
+      } catch (error) {
+        console.error("Could not restore this version", error);
+      }
+    };
+    window.addEventListener("syncpad:request-document-state", onState);
+    window.addEventListener("syncpad:request-page-text", onText);
+    window.addEventListener("syncpad:restore-state", onRestore);
+    return () => {
+      window.removeEventListener("syncpad:request-document-state", onState);
+      window.removeEventListener("syncpad:request-page-text", onText);
+      window.removeEventListener("syncpad:restore-state", onRestore);
+    };
+  }, [editor, role, session.ydoc]);
+
   useLayoutEffect(() => {
     const provider = session.provider;
     if (!editor || role !== "edit" || !provider) return;
@@ -489,7 +550,11 @@ function CollabEditor({ docId, session }: InnerProps) {
       <PresenceAvatars provider={session.provider} />
       <div className="relative w-full text-left" ref={frameRef}>
         {editor && role === "edit" ? (
-          <BubbleMenu editor={editor} data-tick={formatTick}>
+          <BubbleMenu
+            editor={editor}
+            data-tick={formatTick}
+            shouldShow={showFormatMenu}
+          >
             <FormatMenu editor={editor} />
           </BubbleMenu>
         ) : null}

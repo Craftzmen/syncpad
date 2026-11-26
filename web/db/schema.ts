@@ -74,6 +74,7 @@ export const documents = pgTable("documents", {
   icon: text("icon"),
   coverColor: text("cover_color"),
   isFavorite: boolean("is_favorite").notNull().default(false),
+  isPinned: boolean("is_pinned").notNull().default(false),
   deletedAt: timestamp("deleted_at", { mode: "date" }),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),

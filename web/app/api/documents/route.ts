@@ -19,16 +19,23 @@ export async function GET() {
   return NextResponse.json(docs);
 }
 
-export async function POST() {
+const DOCUMENT_ID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export async function POST(request: Request) {
   const database = requireDb();
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const body = (await request.json().catch(() => null)) as { id?: string } | null;
+  const id = body?.id && DOCUMENT_ID.test(body.id) ? body.id : undefined;
+
   const [doc] = await database
     .insert(documents)
     .values({
+      ...(id ? { id } : {}),
       ownerId: session.user.id,
       title: "New page",
     })

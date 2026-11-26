@@ -32,6 +32,39 @@ function bytesFromBase64(value: string) {
   return bytes;
 }
 
+export function encodeDocumentState(ydoc: Y.Doc) {
+  const bytes = Y.encodeStateAsUpdate(ydoc);
+  let binary = "";
+  const size = 0x8000;
+  for (let index = 0; index < bytes.length; index += size) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + size));
+  }
+  return btoa(binary);
+}
+
+/** Replace the visible page with a saved Yjs snapshot without merging the two. */
+export function replaceDocumentFragment(target: Y.Doc, state: string) {
+  const source = new Y.Doc();
+  try {
+    Y.applyUpdate(source, bytesFromBase64(state));
+    const from = source.getXmlFragment("default");
+    const to = target.getXmlFragment("default");
+    const clones: Array<Y.XmlElement | Y.XmlText> = [];
+    for (let index = 0; index < from.length; index += 1) {
+      const child = from.get(index);
+      if (child instanceof Y.XmlElement || child instanceof Y.XmlText) {
+        clones.push(child.clone());
+      }
+    }
+    target.transact(() => {
+      if (to.length > 0) to.delete(0, to.length);
+      if (clones.length > 0) to.insert(0, clones);
+    });
+  } finally {
+    source.destroy();
+  }
+}
+
 export function openSession(
   documentId: string,
   bootstrap: CollabBootstrap,

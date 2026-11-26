@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 
 import { askConfirm } from "@/components/editor/editor-prompt";
+import { useWorkspace } from "@/components/WorkspaceShell";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -25,6 +26,7 @@ export function DocToolbar({
   canEdit: boolean;
 }) {
   const router = useRouter();
+  const workspace = useWorkspace();
 
   async function saveSnapshot() {
     await fetch(`/api/documents/${documentId}/snapshots`, {
@@ -45,12 +47,12 @@ export function DocToolbar({
       confirmLabel: "Move to trash",
     });
     if (!ok) return;
+    workspace?.forgetDoc(documentId);
+    router.push("/dashboard");
     const res = await fetch(`/api/documents/${documentId}`, {
       method: "DELETE",
     });
-    if (!res.ok) return;
-    router.push("/dashboard");
-    router.refresh();
+    if (!res.ok) router.push(`/doc/${documentId}`);
   }
 
   return (

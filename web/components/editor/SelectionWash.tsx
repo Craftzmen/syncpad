@@ -39,6 +39,7 @@ export function SelectionWash({ editor, frame }: { editor: Editor; frame: HTMLEl
       if (event.button !== 0) return;
       const target = event.target instanceof Element ? event.target : null;
       if (!target || !article.contains(target)) return;
+      if (target.closest(".media-handle, .media-frame")) return;
       if (target.closest("[data-table-handle]")) {
         clearMarks();
         return;

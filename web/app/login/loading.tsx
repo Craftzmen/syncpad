@@ -1,5 +1,5 @@
-import { AuthPageSkeleton } from "@/components/page-skeletons";
+import { LoginPageSkeleton } from "@/components/page-skeletons";
 
 export default function LoginLoading() {
-  return <AuthPageSkeleton />;
+  return <LoginPageSkeleton />;
 }

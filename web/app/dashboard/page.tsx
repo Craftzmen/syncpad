@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Clock, FileText, Star } from "lucide-react";
+import { Clock, FileText, Pin, Star } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -17,8 +17,9 @@ export default async function DashboardPage() {
   }
 
   const documents = await listDocumentsForUser(session.user.id);
-  const favorites = documents.filter((d) => d.isFavorite);
-  const recent = documents.filter((d) => !d.isFavorite).slice(0, 8);
+  const pinned = documents.filter((d) => d.isPinned);
+  const favorites = documents.filter((d) => d.isFavorite && !d.isPinned);
+  const recent = documents.filter((d) => !d.isPinned && !d.isFavorite).slice(0, 8);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -39,6 +40,20 @@ export default async function DashboardPage() {
           <div className="mt-8">
             <CreatePageClient />
           </div>
+
+          {pinned.length > 0 ? (
+            <section className="mt-10">
+              <h3 className="mb-2 flex items-center gap-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                <Pin className="size-3.5" />
+                Pinned
+              </h3>
+              <ul className="space-y-px">
+                {pinned.map((doc) => (
+                  <PageRow key={doc.id} doc={doc} />
+                ))}
+              </ul>
+            </section>
+          ) : null}
 
           {favorites.length > 0 ? (
             <section className="mt-10">

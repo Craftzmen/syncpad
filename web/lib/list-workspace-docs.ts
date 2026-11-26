@@ -1,7 +1,9 @@
+import { after } from "next/server";
+
 import { mapSidebarDocs } from "@/lib/sidebar-docs";
 import { isMissingSchemaError, getErrorCause } from "@/lib/db-errors";
 import { claimDocumentInvites } from "@/lib/page-mail";
-import { invalidateDocumentList, listDocumentsForUser } from "@/lib/permissions";
+import { listDocumentsForUser } from "@/lib/permissions";
 
 const claimedAt = new Map<string, number>();
 const CLAIM_TTL_MS = 60_000;
@@ -15,13 +17,18 @@ export async function loadWorkspaceDocs(
   userId: string,
 ): Promise<WorkspaceDocsResult> {
   try {
+    const documents = await listDocumentsForUser(userId);
     const lastClaim = claimedAt.get(userId) ?? 0;
     if (Date.now() - lastClaim > CLAIM_TTL_MS) {
-      await claimDocumentInvites(userId);
       claimedAt.set(userId, Date.now());
-      invalidateDocumentList(userId);
+      after(async () => {
+        try {
+          await claimDocumentInvites(userId);
+        } catch {
+          claimedAt.delete(userId);
+        }
+      });
     }
-    const documents = await listDocumentsForUser(userId);
     return { ok: true, documents: mapSidebarDocs(documents) };
   } catch (error) {
     if (isMissingSchemaError(error)) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { Extension, mergeAttributes, Node, type Editor } from "@tiptap/core";
+import { mergeAttributes, Node, type Editor } from "@tiptap/core";
 import { Plugin, TextSelection, type EditorState, type Transaction } from "@tiptap/pm/state";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import {
@@ -501,57 +501,6 @@ export const Bookmark = Node.create({
   },
 });
 
-function videoEmbed(src: string) {
-  const vimeo = src.match(/vimeo\.com\/(?:video\/)?(\d+)/);
-  if (vimeo) {
-    return { kind: "iframe" as const, src: `https://player.vimeo.com/video/${vimeo[1]}` };
-  }
-  return { kind: "file" as const, src };
-}
-
-function VideoView({ node }: ReactNodeViewProps) {
-  const src = String(node.attrs.src || "");
-  const embed = videoEmbed(src);
-  return (
-    <NodeViewWrapper className="video-block" data-video="">
-      {embed.kind === "iframe" ? (
-        <iframe
-          src={embed.src}
-          title="Video"
-          allow="fullscreen; picture-in-picture"
-          allowFullScreen
-        />
-      ) : (
-        <video src={embed.src} controls />
-      )}
-    </NodeViewWrapper>
-  );
-}
-
-export const Video = Node.create({
-  name: "video",
-  group: "block",
-  atom: true,
-
-  addAttributes() {
-    return {
-      src: { default: "" },
-    };
-  },
-
-  parseHTML() {
-    return [{ tag: "div[data-video]" }];
-  },
-
-  renderHTML({ HTMLAttributes }) {
-    return ["div", mergeAttributes(HTMLAttributes, { "data-video": "", "data-src": HTMLAttributes.src })];
-  },
-
-  addNodeView() {
-    return ReactNodeViewRenderer(VideoView);
-  },
-});
-
 function MermaidView({ node, updateAttributes, editor, getPos }: ReactNodeViewProps) {
   const source = String(node.attrs.source ?? DEFAULT_MERMAID);
   const [svg, setSvg] = useState("");
@@ -754,40 +703,6 @@ function TocView({ editor }: ReactNodeViewProps) {
     </NodeViewWrapper>
   );
 }
-
-function imageFromClipboard(data: DataTransfer | null) {
-  if (!data) return null;
-  const file = Array.from(data.files).find((item) => item.type.startsWith("image/"));
-  if (file) return file;
-  for (const item of Array.from(data.items)) {
-    if (item.kind === "file" && item.type.startsWith("image/")) return item.getAsFile();
-  }
-  return null;
-}
-
-export const ImagePaste = Extension.create({
-  name: "imagePaste",
-  addProseMirrorPlugins() {
-    const editor = this.editor;
-    return [
-      new Plugin({
-        props: {
-          handlePaste(_view, event) {
-            const file = imageFromClipboard(event.clipboardData);
-            if (!file) return false;
-            const reader = new FileReader();
-            reader.onload = () => {
-              const src = String(reader.result || "");
-              if (src) editor.chain().focus().setImage({ src }).run();
-            };
-            reader.readAsDataURL(file);
-            return true;
-          },
-        },
-      }),
-    ];
-  },
-});
 
 export const TableOfContents = Node.create({
   name: "toc",

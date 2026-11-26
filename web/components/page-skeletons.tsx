@@ -31,10 +31,36 @@ export function WorkspaceSkeleton() {
 
 export function AuthPageSkeleton() {
   return (
-    <main className="flex h-full flex-1 flex-col items-center justify-center gap-4">
-      <Skeleton className="h-8 w-40 bg-[#f1f1ef]" />
-      <Skeleton className="h-4 w-64 bg-[#f1f1ef]" />
-      <Skeleton className="mt-2 h-10 w-44 rounded-lg bg-[#f1f1ef]" />
+    <main className="flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-[#f6f6f4]">
+      <div className="mx-auto flex h-16 w-full max-w-6xl items-center px-5 sm:px-8">
+        <Skeleton className="size-8 rounded-[10px] bg-[#e7e7e4]" />
+        <Skeleton className="ml-2.5 h-4 w-20 bg-[#e7e7e4]" />
+        <Skeleton className="ml-auto h-8 w-20 rounded-lg bg-[#e7e7e4]" />
+      </div>
+      <div className="mx-auto mt-12 flex w-full max-w-xl flex-col items-center gap-3 px-6">
+        <Skeleton className="h-3 w-36 bg-[#e7e7e4]" />
+        <Skeleton className="h-10 w-full bg-[#e6e6e3]" />
+        <Skeleton className="h-10 w-4/5 bg-[#e6e6e3]" />
+        <Skeleton className="mt-1 h-4 w-2/3 bg-[#e7e7e4]" />
+        <Skeleton className="mt-4 h-10 w-48 rounded-lg bg-[#dededb]" />
+      </div>
+      <Skeleton className="mx-auto mt-12 h-72 w-[calc(100%-2.5rem)] max-w-5xl rounded-2xl bg-[#ecece8]" />
+    </main>
+  );
+}
+
+export function LoginPageSkeleton() {
+  return (
+    <main className="grid h-full min-h-0 flex-1 bg-white lg:grid-cols-2">
+      <div className="hidden bg-[#f6f6f4] lg:block" />
+      <div className="flex items-center justify-center px-6">
+        <div className="flex w-full max-w-sm flex-col gap-3">
+          <Skeleton className="size-8 rounded-[10px] bg-[#f1f1ef]" />
+          <Skeleton className="h-7 w-40 bg-[#f1f1ef]" />
+          <Skeleton className="h-4 w-56 bg-[#f1f1ef]" />
+          <Skeleton className="mt-4 h-10 w-full rounded-lg bg-[#ecece8]" />
+        </div>
+      </div>
     </main>
   );
 }

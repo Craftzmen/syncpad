@@ -985,3 +985,99 @@
   height: auto !important;
   margin: 0 auto;
 }
+
+.tiptap.notion-editor.is-file-drop {
+  outline: 2px dashed #2383e2;
+  outline-offset: -10px;
+  background: rgba(35, 131, 226, 0.04);
+}
+
+.tiptap.notion-editor .media-frame {
+  position: relative;
+  max-width: 100%;
+  margin: 8px 0;
+}
+
+.tiptap.notion-editor .media-frame-body {
+  position: relative;
+}
+
+.tiptap.notion-editor .media-frame img,
+.tiptap.notion-editor .media-frame video,
+.tiptap.notion-editor .media-frame iframe {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  margin: 0;
+  border: 0;
+  border-radius: 6px;
+}
+
+.tiptap.notion-editor .media-frame video,
+.tiptap.notion-editor .media-frame iframe {
+  aspect-ratio: 16 / 9;
+  background: #111;
+}
+
+.tiptap.notion-editor .react-renderer:has(> .media-frame) {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+}
+
+.tiptap.notion-editor .media-handle {
+  position: absolute;
+  z-index: 3;
+  width: 18px;
+  height: 18px;
+  border: 2px solid #fff;
+  border-radius: 5px;
+  background: #2383e2;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.28);
+  pointer-events: auto;
+  touch-action: none;
+  opacity: 0;
+}
+
+.tiptap.notion-editor .media-frame:hover .media-handle,
+.tiptap.notion-editor .media-frame.is-selected .media-handle,
+.tiptap.notion-editor .media-frame.is-resizing .media-handle {
+  opacity: 1;
+}
+
+.tiptap.notion-editor .media-handle::before {
+  content: "";
+  position: absolute;
+  inset: -10px;
+}
+
+.tiptap.notion-editor .media-handle-top-left {
+  top: -9px;
+  left: -9px;
+  cursor: nwse-resize;
+}
+
+.tiptap.notion-editor .media-handle-top-right {
+  top: -9px;
+  right: -9px;
+  cursor: nesw-resize;
+}
+
+.tiptap.notion-editor .media-handle-bottom-left {
+  bottom: -9px;
+  left: -9px;
+  cursor: nesw-resize;
+}
+
+.tiptap.notion-editor .media-handle-bottom-right {
+  right: -9px;
+  bottom: -9px;
+  cursor: nwse-resize;
+}
+
+.tiptap.notion-editor .media-frame.is-selected .media-frame-body {
+  border-radius: 8px;
+  outline: 2px solid #2383e2;
+  outline-offset: 2px;
+}

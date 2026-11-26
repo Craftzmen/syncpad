@@ -44,6 +44,8 @@ export async function PATCH(request: Request, { params }: Params) {
     icon?: string | null;
     coverColor?: string | null;
     isFavorite?: boolean;
+    isPinned?: boolean;
+    restore?: boolean;
   };
 
   const updates: Partial<typeof documents.$inferInsert> = {
@@ -62,12 +64,34 @@ export async function PATCH(request: Request, { params }: Params) {
   if (body.isFavorite !== undefined) {
     updates.isFavorite = body.isFavorite;
   }
+  if (body.isPinned !== undefined) {
+    updates.isPinned = body.isPinned;
+  }
+  if (body.restore === true) {
+    const [existing] = await database
+      .select({ ownerId: documents.ownerId })
+      .from(documents)
+      .where(eq(documents.id, id))
+      .limit(1);
+    const userId = session?.user?.id;
+    if (!existing || !userId || existing.ownerId !== userId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    const [restored] = await database
+      .update(documents)
+      .set({ deletedAt: null, updatedAt: new Date() })
+      .where(eq(documents.id, id))
+      .returning();
+    invalidateDocumentList(userId);
+    return NextResponse.json(restored);
+  }
 
   if (
     body.title === undefined &&
     body.icon === undefined &&
     body.coverColor === undefined &&
-    body.isFavorite === undefined
+    body.isFavorite === undefined &&
+    body.isPinned === undefined
   ) {
     return NextResponse.json({ error: "No updates" }, { status: 400 });
   }
@@ -84,7 +108,7 @@ export async function PATCH(request: Request, { params }: Params) {
   return NextResponse.json(doc);
 }
 
-export async function DELETE(_request: Request, { params }: Params) {
+export async function DELETE(request: Request, { params }: Params) {
   const { id } = await params;
   const database = requireDb();
   const session = await auth();
@@ -102,10 +126,17 @@ export async function DELETE(_request: Request, { params }: Params) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  await database
-    .update(documents)
-    .set({ deletedAt: new Date(), updatedAt: new Date() })
-    .where(eq(documents.id, id));
+  const permanent = new URL(request.url).searchParams.get("permanent") === "1";
+  if (permanent) {
+    await database
+      .delete(documents)
+      .where(and(eq(documents.id, id), eq(documents.ownerId, session.user.id)));
+  } else {
+    await database
+      .update(documents)
+      .set({ deletedAt: new Date(), updatedAt: new Date() })
+      .where(eq(documents.id, id));
+  }
   invalidateDocumentList(session.user.id);
   return NextResponse.json({ ok: true });
 }

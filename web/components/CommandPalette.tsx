@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { FileText, Home, Plus } from "lucide-react";
+import { FileText, Home, Pin, Plus, Star, Trash2 } from "lucide-react";
 
 import { PageIconView } from "@/components/PageIconView";
 import { useCreateDoc, type SidebarDoc } from "@/components/WorkspaceShell";
@@ -34,8 +34,9 @@ export function CommandPalette({
     router.push(path);
   }
 
-  const favorites = documents.filter((d) => d.isFavorite);
-  const recent = documents.filter((d) => !d.isFavorite).slice(0, 12);
+  const pinned = documents.filter((d) => d.isPinned);
+  const favorites = documents.filter((d) => d.isFavorite && !d.isPinned);
+  const recent = documents.filter((d) => !d.isPinned && !d.isFavorite).slice(0, 12);
 
   return (
     <CommandDialog
@@ -65,7 +66,28 @@ export function CommandPalette({
               <Home className="size-4 text-[#0d0d0d]/55" />
               Home
             </CommandItem>
+            <CommandItem onSelect={() => go("/dashboard/trash")}>
+              <Trash2 className="size-4 text-[#0d0d0d]/55" />
+              Trash
+            </CommandItem>
           </CommandGroup>
+          {pinned.length > 0 ? (
+            <>
+              <CommandSeparator />
+              <CommandGroup heading="Pinned">
+                {pinned.map((doc) => (
+                  <CommandItem
+                    key={doc.id}
+                    value={`pinned ${doc.title} ${doc.id}`}
+                    onSelect={() => go(`/doc/${doc.id}`)}
+                  >
+                    <Pin className="size-4 text-[#0d0d0d]/55" />
+                    {displayPageTitle(doc.title)}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </>
+          ) : null}
           {favorites.length > 0 ? (
             <>
               <CommandSeparator />
@@ -76,13 +98,7 @@ export function CommandPalette({
                     value={`${doc.title} ${doc.id}`}
                     onSelect={() => go(`/doc/${doc.id}`)}
                   >
-                    <span className="inline-flex size-4 items-center justify-center text-[#8e8e8e]">
-                      {doc.icon ? (
-                        <PageIconView value={doc.icon} />
-                      ) : (
-                        <FileText className="size-4" strokeWidth={1.75} />
-                      )}
-                    </span>
+                    <Star className="size-4 fill-amber-400 text-amber-500" />
                     {displayPageTitle(doc.title)}
                   </CommandItem>
                 ))}

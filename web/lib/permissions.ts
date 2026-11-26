@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, or } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull, or } from "drizzle-orm";
 
 import { requireDb } from "@/db";
 import {
@@ -103,6 +103,15 @@ async function queryDocumentsForUser(userId: string) {
     byId.set(row.document.id, row.document);
   }
   return Array.from(byId.values());
+}
+
+export async function listTrashedDocuments(userId: string) {
+  const database = requireDb();
+  return database
+    .select()
+    .from(documents)
+    .where(and(eq(documents.ownerId, userId), isNotNull(documents.deletedAt)))
+    .orderBy(desc(documents.deletedAt));
 }
 
 export async function listDocumentsForUser(userId: string) {

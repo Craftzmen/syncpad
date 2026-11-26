@@ -9,6 +9,7 @@ export function mapSidebarDocs(docs: DbDocument[]): SidebarDoc[] {
     title: d.title,
     icon: d.icon,
     isFavorite: d.isFavorite,
+    isPinned: d.isPinned,
     updatedAt: d.updatedAt.toISOString(),
   }));
 }

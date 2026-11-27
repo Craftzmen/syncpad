@@ -1081,3 +1081,31 @@
   outline: 2px solid #2383e2;
   outline-offset: 2px;
 }
+
+.tiptap .collaboration-carets__caret {
+  position: relative;
+  z-index: 30;
+  border-left: 2px solid currentColor;
+  border-right: 0;
+  margin-left: -1px;
+  margin-right: 0;
+  pointer-events: none;
+}
+
+.tiptap .collaboration-carets__label {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: -2px;
+  z-index: 40;
+  border-radius: 999px;
+  padding: 3px 8px;
+  color: #fff !important;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  box-shadow:
+    0 0 0 2px #fff,
+    0 4px 14px rgba(0, 0, 0, 0.28);
+}

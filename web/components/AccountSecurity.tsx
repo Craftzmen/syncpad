@@ -143,7 +143,7 @@ export function AccountSecurity({
                 Log out of SyncPad?
               </DialogTitle>
               <DialogDescription className="text-[13px] leading-5 text-[#6f6f6f]">
-                This ends the session on this browser. Sign in with GitHub again to open your pages.
+                This ends the session on this browser. Sign in again to open your pages.
                 Everything already saved stays on {name}&apos;s account.
               </DialogDescription>
             </DialogHeader>

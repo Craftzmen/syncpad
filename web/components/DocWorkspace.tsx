@@ -218,6 +218,21 @@ export function DocWorkspace({
   }, [canEdit, loadAccess]);
 
   useEffect(() => {
+    if (!accessReady || !canEdit) return;
+    const shared = accessMembers.length + accessInvites.length > 0;
+    if (Boolean(listed?.shared) === shared) return;
+    workspace?.patchDoc(documentId, { shared });
+  }, [
+    accessInvites.length,
+    accessMembers.length,
+    accessReady,
+    canEdit,
+    documentId,
+    listed?.shared,
+    workspace,
+  ]);
+
+  useEffect(() => {
     const onEmpty = (event: Event) => {
       setIsEmpty(Boolean((event as CustomEvent<boolean>).detail));
     };

@@ -4,19 +4,21 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { requireDb } from "@/db";
 import { documents, yjsDocumentState } from "@/db/schema";
+import { claimDocumentInvites } from "@/lib/page-mail";
 import {
   invalidateDocumentList,
   listDocumentsForUser,
 } from "@/lib/permissions";
+import { mapSidebarDocs } from "@/lib/sidebar-docs";
 
 export async function GET() {
-  const database = requireDb();
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const docs = await listDocumentsForUser(session.user.id);
-  return NextResponse.json(docs);
+  await claimDocumentInvites(session.user.id);
+  const docs = await listDocumentsForUser(session.user.id, { fresh: true });
+  return NextResponse.json(mapSidebarDocs(docs));
 }
 
 const DOCUMENT_ID =

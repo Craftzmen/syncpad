@@ -4,9 +4,10 @@ import { redirect } from "next/navigation";
 export const dynamic = "force-dynamic";
 
 import { auth, signIn } from "@/auth";
-import { GitHubButton, ProductPreview, Wordmark } from "@/components/auth-pages";
+import { GitHubButton, GoogleButton, ProductPreview, Wordmark } from "@/components/auth-pages";
 import { isDatabaseConfigured } from "@/db";
 import { isGitHubOAuthConfigured } from "@/lib/github-auth";
+import { isGoogleOAuthConfigured } from "@/lib/google-auth";
 
 export default async function LoginPage({
   searchParams,
@@ -24,6 +25,7 @@ export default async function LoginPage({
   }
 
   const githubReady = isGitHubOAuthConfigured();
+  const googleReady = isGoogleOAuthConfigured();
   const databaseReady = isDatabaseConfigured();
 
   return (
@@ -50,10 +52,22 @@ export default async function LoginPage({
         <div className="mx-auto flex w-full max-w-[380px] flex-1 flex-col justify-center py-12">
           <h1 className="text-[28px] font-semibold tracking-[-0.03em] text-[#191919]">Welcome back</h1>
           <p className="mt-2 text-[14px] leading-6 text-black/55">
-            Sign in with GitHub to open your pages.
+            Sign in with Google or GitHub to open your pages.
           </p>
 
-          <div className="mt-8">
+          <div className="mt-8 space-y-3">
+            {googleReady ? (
+              <form
+                action={async () => {
+                  "use server";
+                  await signIn("google", { redirectTo: "/dashboard" });
+                }}
+              >
+                <GoogleButton type="submit" full>
+                  Continue with Google
+                </GoogleButton>
+              </form>
+            ) : null}
             {githubReady ? (
               <form
                 action={async () => {
@@ -65,9 +79,14 @@ export default async function LoginPage({
                   Continue with GitHub
                 </GitHubButton>
               </form>
-            ) : (
-              <SetupNotice />
-            )}
+            ) : null}
+            {!githubReady && !googleReady ? <SetupNotice /> : null}
+            {githubReady && !googleReady ? (
+              <p className="text-[12px] leading-5 text-black/45">
+                Google sign-in appears after <code>AUTH_GOOGLE_ID</code> and{" "}
+                <code>AUTH_GOOGLE_SECRET</code> are set.
+              </p>
+            ) : null}
           </div>
 
           {!databaseReady ? (
@@ -77,7 +96,7 @@ export default async function LoginPage({
                 Add <code className="text-[12px]">DATABASE_URL</code> to{" "}
                 <code className="text-[12px]">web/.env.local</code>, then run{" "}
                 <code className="text-[12px]">npm run db:push</code> in{" "}
-                <code className="text-[12px]">web/</code>. GitHub login can work before that.
+                <code className="text-[12px]">web/</code>. Sign-in can work before that.
                 Saving pages needs Postgres.
               </p>
             </div>
@@ -98,10 +117,12 @@ export default async function LoginPage({
 function SetupNotice() {
   return (
     <div className="rounded-xl border border-black/[0.08] bg-[#f7f7f5] px-4 py-4 text-left text-[13px] leading-5 text-[#37352f]">
-      <p className="font-medium">GitHub sign-in is not configured yet</p>
+      <p className="font-medium">Sign-in is not configured yet</p>
       <p className="mt-1 text-black/55">
-        Add <code className="text-[12px]">AUTH_GITHUB_ID</code> and{" "}
-        <code className="text-[12px]">AUTH_GITHUB_SECRET</code> to{" "}
+        Add GitHub keys (<code className="text-[12px]">AUTH_GITHUB_ID</code>,{" "}
+        <code className="text-[12px]">AUTH_GITHUB_SECRET</code>) or Google keys (
+        <code className="text-[12px]">AUTH_GOOGLE_ID</code>,{" "}
+        <code className="text-[12px]">AUTH_GOOGLE_SECRET</code>) to{" "}
         <code className="text-[12px]">web/.env.local</code>.
       </p>
       <ol className="mt-3 list-decimal space-y-1.5 pl-4 text-black/55">

@@ -7,7 +7,6 @@ import { auth } from "@/auth";
 import {
   CloseSection,
   FeatureGrid,
-  GitHubIcon,
   ProductPreview,
   TogetherSection,
   Wordmark,
@@ -57,8 +56,7 @@ export default async function Home() {
               href="/login"
               className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#191919] px-4 text-[14px] font-medium text-white hover:bg-black"
             >
-              <GitHubIcon />
-              Sign in with GitHub
+              Sign in
             </Link>
           </div>
         </section>

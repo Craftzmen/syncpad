@@ -104,3 +104,41 @@ export function deliverPageText(text: string | null) {
 export function requestRestoreState(state: string) {
   window.dispatchEvent(new CustomEvent("syncpad:restore-state", { detail: state }));
 }
+
+export type ExportedDoc = {
+  type: string;
+  attrs?: Record<string, unknown>;
+  content?: ExportedDoc[];
+  text?: string;
+  marks?: { type: string; attrs?: Record<string, unknown> }[];
+};
+
+let exportWait: {
+  resolve: (value: ExportedDoc | null) => void;
+  timer: number;
+} | null = null;
+
+export function requestPageExport() {
+  return new Promise<ExportedDoc | null>((resolve) => {
+    if (exportWait) {
+      window.clearTimeout(exportWait.timer);
+      exportWait.resolve(null);
+    }
+    exportWait = {
+      resolve,
+      timer: window.setTimeout(() => {
+        exportWait = null;
+        resolve(null);
+      }, 1500),
+    };
+    window.dispatchEvent(new CustomEvent("syncpad:request-page-export"));
+  });
+}
+
+export function deliverPageExport(value: ExportedDoc | null) {
+  if (!exportWait) return;
+  window.clearTimeout(exportWait.timer);
+  const resolve = exportWait.resolve;
+  exportWait = null;
+  resolve(value);
+}

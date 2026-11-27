@@ -25,6 +25,8 @@ export type SidebarDoc = {
   icon?: string | null;
   isFavorite?: boolean;
   isPinned?: boolean;
+  shared?: boolean;
+  owned?: boolean;
   updatedAt?: string;
 };
 
@@ -80,6 +82,8 @@ export function WorkspaceShell({
       icon: null,
       isFavorite: false,
       isPinned: false,
+      shared: false,
+      owned: true,
     };
     rememberAdded(optimistic);
     setDocs((current) => [optimistic, ...current.filter((item) => item.id !== id)]);
@@ -118,6 +122,34 @@ export function WorkspaceShell({
       current.map((item) => (item.id === id ? { ...item, ...partial } : item)),
     );
   }
+
+  useEffect(() => {
+    let stopped = false;
+    const pull = async () => {
+      try {
+        const response = await fetch("/api/documents", { cache: "no-store" });
+        if (!response.ok || stopped) return;
+        const incoming = (await response.json()) as SidebarDoc[];
+        if (!Array.isArray(incoming) || stopped) return;
+        setDocs(mergeServerDocs(incoming));
+      } catch {
+        // The next pass tries again.
+      }
+    };
+    const interval = window.setInterval(() => void pull(), 5000);
+    const onFocus = () => {
+      if (document.visibilityState === "hidden") return;
+      void pull();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    return () => {
+      stopped = true;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {

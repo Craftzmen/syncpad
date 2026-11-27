@@ -74,8 +74,9 @@ export function AppSidebar({
   }
 
   const initial = (userName?.trim()?.[0] ?? "S").toUpperCase();
-  const favorites = documents.filter((doc) => doc.isPinned);
-  const privatePages = documents.filter((doc) => !doc.isPinned);
+  const favorites = documents.filter((doc) => doc.isPinned && !doc.shared);
+  const sharedPages = documents.filter((doc) => doc.shared);
+  const privatePages = documents.filter((doc) => !doc.shared && !doc.isPinned);
   const pinned = pinnedOpen ? favorites : favorites.slice(0, 6);
 
   return (
@@ -233,7 +234,25 @@ export function AppSidebar({
               </section>
             ) : null}
 
-            <section className={favorites.length > 0 ? "mt-4" : undefined}>
+            {sharedPages.length > 0 ? (
+              <section className={favorites.length > 0 ? "mt-4" : undefined}>
+                <p className="px-2.5 pb-1 text-[13px] text-[#8e8e8e]">Shared</p>
+                <ul>
+                  {sharedPages.map((doc) => (
+                    <PageLink
+                      key={doc.id}
+                      doc={doc}
+                      active={pathname === `/doc/${doc.id}`}
+                    />
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+
+            {privatePages.length > 0 || documents.length === 0 ? (
+            <section
+              className={favorites.length > 0 || sharedPages.length > 0 ? "mt-4" : undefined}
+            >
               <p className="px-2.5 pb-1 text-[13px] text-[#8e8e8e]">Private</p>
               <ul>
                 {privatePages.map((doc) => (
@@ -248,6 +267,7 @@ export function AppSidebar({
                 <p className="px-2.5 py-2 text-[13px] text-[#8e8e8e]">No pages yet</p>
               ) : null}
             </section>
+            ) : null}
           </nav>
           <div className="shrink-0 border-t border-black/[0.06] p-2">
             <Link
@@ -476,8 +496,21 @@ function PageLink({
             <FileText className="size-4 shrink-0 text-[#8e8e8e]" strokeWidth={1.75} />
           )}
           <span className="truncate">{displayPageTitle(doc.title)}</span>
+          {doc.isPinned && !plain ? (
+            <Pin
+              className={cn(
+                "size-3 shrink-0 text-[#8e8e8e]",
+                doc.isFavorite ? "" : "ml-auto",
+              )}
+            />
+          ) : null}
           {doc.isFavorite ? (
-            <Star className="ml-auto size-3 shrink-0 fill-amber-400 text-amber-500" />
+            <Star
+              className={cn(
+                "size-3 shrink-0 fill-amber-400 text-amber-500",
+                doc.isPinned && !plain ? "" : "ml-auto",
+              )}
+            />
           ) : null}
         </Link>
       )}
@@ -530,11 +563,13 @@ function PageLink({
                   setMenuOpen(false);
                 }}
               />
-              <NotionMenuItem
-                icon={Trash2}
-                label="Move to Trash"
-                onClick={() => void moveToTrash()}
-              />
+              {doc.owned === false ? null : (
+                <NotionMenuItem
+                  icon={Trash2}
+                  label="Move to Trash"
+                  onClick={() => void moveToTrash()}
+                />
+              )}
             </div>
             <div className="border-t border-black/5 px-3 py-2 text-[11px] leading-relaxed text-[#0d0d0d]/45">
               <p>Last edited</p>

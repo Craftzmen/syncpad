@@ -1,9 +1,11 @@
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import NextAuth from "next-auth";
 import GitHub from "next-auth/providers/github";
+import Google from "next-auth/providers/google";
 
 import { db, isDatabaseConfigured } from "@/db";
 import { getGitHubProviderConfig } from "@/lib/github-auth";
+import { getGoogleProviderConfig } from "@/lib/google-auth";
 import {
   accounts,
   sessions,
@@ -31,6 +33,7 @@ function resolveAuthSecret() {
 }
 
 const githubConfig = getGitHubProviderConfig();
+const googleConfig = getGoogleProviderConfig();
 const useDatabase = isDatabaseConfigured() && db != null;
 
 if (!useDatabase) {
@@ -52,21 +55,35 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }),
       }
     : {}),
-  providers:
-    githubConfig != null
+  providers: [
+    ...(githubConfig
       ? [
           GitHub({
             clientId: githubConfig.clientId,
             clientSecret: githubConfig.clientSecret,
+            allowDangerousEmailAccountLinking: true,
           }),
         ]
-      : [],
+      : []),
+    ...(googleConfig
+      ? [
+          Google({
+            clientId: googleConfig.clientId,
+            clientSecret: googleConfig.clientSecret,
+            allowDangerousEmailAccountLinking: true,
+          }),
+        ]
+      : []),
+  ],
   pages: {
     signIn: "/login",
   },
   trustHost: true,
   callbacks: {
-    jwt({ token, user, profile }) {
+    jwt({ token, user, account, profile }) {
+      if (account?.provider) {
+        token.provider = account.provider;
+      }
       if (user?.id) {
         token.sub = user.id;
       } else if (
@@ -83,6 +100,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     session({ session, user, token }) {
       if (session.user) {
         session.user.id = user?.id ?? token?.sub ?? "";
+        if (token.provider === "google" || token.provider === "github") {
+          session.user.provider = token.provider;
+        }
       }
       return session;
     },

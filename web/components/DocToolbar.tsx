@@ -1,12 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import {
-  Download,
-  Ellipsis,
-  History,
-  Trash2,
-} from "lucide-react";
+import { Ellipsis, History, Trash2 } from "lucide-react";
 
 import { askConfirm } from "@/components/editor/editor-prompt";
 import { useWorkspace } from "@/components/WorkspaceShell";
@@ -34,10 +29,6 @@ export function DocToolbar({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ label: new Date().toLocaleString() }),
     });
-  }
-
-  function exportDoc(format: "html" | "md") {
-    window.open(`/api/documents/${documentId}/export?format=${format}`, "_blank");
   }
 
   async function moveToTrash() {
@@ -80,17 +71,6 @@ export function DocToolbar({
               Save version
             </DropdownMenuItem>
           ) : null}
-          <DropdownMenuItem
-            className="gap-2"
-            onClick={() => exportDoc("html")}
-          >
-            <Download className="size-4 opacity-70" />
-            Export HTML
-          </DropdownMenuItem>
-          <DropdownMenuItem className="gap-2" onClick={() => exportDoc("md")}>
-            <Download className="size-4 opacity-70" />
-            Export Markdown
-          </DropdownMenuItem>
           {canEdit ? (
             <DropdownMenuItem
               variant="destructive"

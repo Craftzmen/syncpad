@@ -41,7 +41,9 @@ import { SlashMenu } from "@/components/SlashMenu";
 import {
   consumePendingInsert,
   deliverDocumentState,
+  deliverPageExport,
   deliverPageText,
+  type ExportedDoc,
   emitEditorEmpty,
   type InsertKind,
 } from "@/lib/editor-events";
@@ -315,6 +317,19 @@ function CollabEditor({ docId, session }: InnerProps) {
                 color: userColor,
                 image: session.image ?? undefined,
               },
+              render: (user) => {
+                const color = user.color || "#db2777";
+                const cursor = document.createElement("span");
+                cursor.classList.add("collaboration-carets__caret");
+                cursor.style.borderColor = color;
+                const label = document.createElement("div");
+                label.classList.add("collaboration-carets__label");
+                label.style.setProperty("background-color", color, "important");
+                label.style.setProperty("color", "#fff", "important");
+                label.textContent = user.name || "Someone";
+                cursor.append(label);
+                return cursor;
+              },
             }),
           ]
         : []),
@@ -425,6 +440,13 @@ function CollabEditor({ docId, session }: InnerProps) {
       }
     };
     const onText = () => deliverPageText(editor?.getText() ?? "");
+    const onExport = () => {
+      if (!editor || editor.isDestroyed) {
+        deliverPageExport(null);
+        return;
+      }
+      deliverPageExport(editor.getJSON() as ExportedDoc);
+    };
     const onRestore = (event: Event) => {
       if (role !== "edit") return;
       const state = (event as CustomEvent<string>).detail;
@@ -437,10 +459,12 @@ function CollabEditor({ docId, session }: InnerProps) {
     };
     window.addEventListener("syncpad:request-document-state", onState);
     window.addEventListener("syncpad:request-page-text", onText);
+    window.addEventListener("syncpad:request-page-export", onExport);
     window.addEventListener("syncpad:restore-state", onRestore);
     return () => {
       window.removeEventListener("syncpad:request-document-state", onState);
       window.removeEventListener("syncpad:request-page-text", onText);
+      window.removeEventListener("syncpad:request-page-export", onExport);
       window.removeEventListener("syncpad:restore-state", onRestore);
     };
   }, [editor, role, session.ydoc]);

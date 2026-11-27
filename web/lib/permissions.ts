@@ -1,4 +1,4 @@
-import { and, desc, eq, isNotNull, isNull, or } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, or } from "drizzle-orm";
 
 import { requireDb } from "@/db";
 import {
@@ -102,7 +102,34 @@ async function queryDocumentsForUser(userId: string) {
   for (const row of rows) {
     byId.set(row.document.id, row.document);
   }
-  return Array.from(byId.values());
+  const docs = Array.from(byId.values());
+  const sharedIds = new Set<string>();
+  if (docs.length > 0) {
+    const members = await database
+      .select({
+        documentId: documentMembers.documentId,
+        userId: documentMembers.userId,
+      })
+      .from(documentMembers)
+      .where(
+        inArray(
+          documentMembers.documentId,
+          docs.map((doc) => doc.id),
+        ),
+      );
+    const owners = new Map(docs.map((doc) => [doc.id, doc.ownerId]));
+    for (const member of members) {
+      if (member.userId !== owners.get(member.documentId)) {
+        sharedIds.add(member.documentId);
+      }
+    }
+  }
+
+  return docs.map((doc) => ({
+    ...doc,
+    owned: doc.ownerId === userId,
+    shared: doc.ownerId !== userId || sharedIds.has(doc.id),
+  }));
 }
 
 export async function listTrashedDocuments(userId: string) {
@@ -114,9 +141,12 @@ export async function listTrashedDocuments(userId: string) {
     .orderBy(desc(documents.deletedAt));
 }
 
-export async function listDocumentsForUser(userId: string) {
+export async function listDocumentsForUser(
+  userId: string,
+  options?: { fresh?: boolean },
+) {
   const cached = documentListCache.get(userId);
-  if (cached && Date.now() - cached.at < DOCUMENT_LIST_TTL_MS) {
+  if (!options?.fresh && cached && Date.now() - cached.at < DOCUMENT_LIST_TTL_MS) {
     return cached.value;
   }
 

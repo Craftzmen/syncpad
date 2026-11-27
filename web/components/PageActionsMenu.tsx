@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Copy,
   Ellipsis,
+  FileCode,
+  FileDown,
+  FileText,
   Files,
   History,
   Link2,
@@ -25,7 +28,18 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { writeClipboard } from "@/lib/clipboard";
-import { readPageTitle, requestPageText } from "@/lib/editor-events";
+import { readPageTitle, requestPageExport, requestPageText } from "@/lib/editor-events";
+import {
+  downloadText,
+  exportFileName,
+  katexCssFromDocument,
+  openPrintWindow,
+  pageIsEmpty,
+  pageToHtml,
+  pageToMarkdown,
+  printHtml,
+} from "@/lib/export-page";
+import { parsePageIcon } from "@/lib/page-icons";
 import { isGhostTitle } from "@/lib/page-title";
 
 type Action = {
@@ -59,6 +73,7 @@ export function PageActionsMenu({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [toast, setToast] = useState<string | null>(null);
+  const exporting = useRef(false);
 
   useEffect(() => {
     if (!toast) return;
@@ -85,6 +100,56 @@ export function PageActionsMenu({
     const ok = await writeClipboard(text);
     setToast(ok ? "Page contents copied" : "Couldn't copy this page");
     setOpen(false);
+  }
+
+  async function exportPage(kind: "pdf" | "html" | "md") {
+    if (exporting.current) return;
+    exporting.current = true;
+    setOpen(false);
+    const preview = kind === "pdf" ? openPrintWindow() : null;
+    if (kind === "pdf" && !preview) {
+      exporting.current = false;
+      setToast("Allow pop-ups to export a PDF");
+      return;
+    }
+    try {
+      const doc = await requestPageExport();
+      const title = readPageTitle();
+      if (!doc || (pageIsEmpty(doc) && isGhostTitle(title))) {
+        preview?.close();
+        setToast(doc ? "This page is empty" : "This page is still opening");
+        return;
+      }
+      const icon = parsePageIcon(
+        workspace?.docs.find((item) => item.id === documentId)?.icon,
+      );
+      const emoji = icon?.kind === "emoji" ? icon.emoji : null;
+      if (kind === "md") {
+        const name = exportFileName(title, "md");
+        downloadText(name, "text/markdown", pageToMarkdown(doc, title));
+        setToast(`Downloaded ${name}`);
+        return;
+      }
+      const html = await pageToHtml(doc, title, {
+        emoji,
+        extraCss: katexCssFromDocument(),
+      });
+      if (kind === "html") {
+        const name = exportFileName(title, "html");
+        downloadText(name, "text/html", html);
+        setToast(`Downloaded ${name}`);
+        return;
+      }
+      if (preview) {
+        await printHtml(preview, html);
+        setToast("Choose Save as PDF");
+      }
+    } catch {
+      preview?.close();
+      setToast("Couldn't export this page");
+    } finally {
+      exporting.current = false;
+    }
   }
 
   async function duplicate() {
@@ -156,20 +221,26 @@ export function PageActionsMenu({
   const actions: Action[] = [
     { id: "link", label: "Copy link", hint: "⌘L", icon: Link2, run: copyLink },
     { id: "contents", label: "Copy page contents", icon: Copy, run: copyContents },
+    { id: "export-pdf", label: "Export as PDF", icon: FileDown, run: () => exportPage("pdf") },
+    { id: "export-html", label: "Export as HTML", icon: FileCode, run: () => exportPage("html") },
+    { id: "export-md", label: "Export as Markdown", icon: FileText, run: () => exportPage("md") },
   ];
+  const owned = workspace?.docs.find((doc) => doc.id === documentId)?.owned !== false;
   if (canEdit) {
     actions.push(
       { id: "dup", label: "Duplicate", hint: "⌘D", icon: Files, run: duplicate },
       { id: "history", label: "Version history", icon: History, run: openHistory },
       { id: "save", label: "Save version", icon: History, run: saveVersion },
-      {
+    );
+    if (owned) {
+      actions.push({
         id: "trash",
         label: "Move to Trash",
         icon: Trash2,
         destructive: true,
         run: moveToTrash,
-      },
-    );
+      });
+    }
   }
 
   const filtered = actions.filter((action) =>
@@ -218,16 +289,21 @@ export function PageActionsMenu({
             </div>
             <div className="p-1">
               <NotionMenuLabel>Actions</NotionMenuLabel>
-              {filtered.map((action) => (
-                <NotionMenuItem
-                  key={action.id}
-                  icon={action.icon}
-                  label={action.label}
-                  hint={action.hint}
-                  destructive={action.destructive}
-                  immediate
-                  onClick={() => void action.run()}
-                />
+              {filtered.map((action, index) => (
+                <Fragment key={action.id}>
+                  {action.id.startsWith("export") &&
+                  !filtered[index - 1]?.id.startsWith("export") ? (
+                    <NotionMenuLabel>Export</NotionMenuLabel>
+                  ) : null}
+                  <NotionMenuItem
+                    icon={action.icon}
+                    label={action.label}
+                    hint={action.hint}
+                    destructive={action.destructive}
+                    immediate
+                    onClick={() => void action.run()}
+                  />
+                </Fragment>
               ))}
               {filtered.length === 0 ? (
                 <p className="px-2 py-3 text-sm text-[#37352f]/45">No actions</p>

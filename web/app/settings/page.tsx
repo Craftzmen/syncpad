@@ -46,7 +46,16 @@ export default async function SettingsPage() {
         <SettingsGroup title="Account">
           <SettingsRow label="Name" value={name} />
           <SettingsRow label="Email" value={email ?? "Not provided"} />
-          <SettingsRow label="Signed in with" value="GitHub" />
+          <SettingsRow
+            label="Signed in with"
+            value={
+              session.user.provider === "google"
+                ? "Google"
+                : session.user.provider === "github"
+                  ? "GitHub"
+                  : "Google or GitHub"
+            }
+          />
         </SettingsGroup>
 
         <SettingsGroup title="Email">

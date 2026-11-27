@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Clock, FileText, Pin, Star } from "lucide-react";
+import { Clock, FileText, Pin, Star, Users } from "lucide-react";
 
 import { PageIconView } from "@/components/PageIconView";
 import { useWorkspace, type SidebarDoc } from "@/components/WorkspaceShell";
@@ -10,9 +10,12 @@ import { displayPageTitle } from "@/lib/page-title";
 export function HomePages() {
   const workspace = useWorkspace();
   const documents = workspace?.docs ?? [];
-  const pinned = documents.filter((doc) => doc.isPinned);
-  const favorites = documents.filter((doc) => doc.isFavorite && !doc.isPinned);
-  const recent = documents.filter((doc) => !doc.isPinned && !doc.isFavorite).slice(0, 8);
+  const pinned = documents.filter((doc) => doc.isPinned && !doc.shared);
+  const shared = documents.filter((doc) => doc.shared);
+  const favorites = documents.filter((doc) => doc.isFavorite && !doc.isPinned && !doc.shared);
+  const recent = documents
+    .filter((doc) => !doc.isPinned && !doc.isFavorite && !doc.shared)
+    .slice(0, 8);
 
   return (
     <>
@@ -24,6 +27,20 @@ export function HomePages() {
           </h3>
           <ul className="space-y-px">
             {pinned.map((doc) => (
+              <PageRow key={doc.id} doc={doc} />
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {shared.length > 0 ? (
+        <section className="mt-10">
+          <h3 className="mb-2 flex items-center gap-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+            <Users className="size-3.5" />
+            Shared
+          </h3>
+          <ul className="space-y-px">
+            {shared.map((doc) => (
               <PageRow key={doc.id} doc={doc} />
             ))}
           </ul>

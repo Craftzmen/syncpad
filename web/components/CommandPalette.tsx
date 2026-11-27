@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { FileText, Home, Pin, Plus, Star, Trash2 } from "lucide-react";
+import { FileText, Home, Pin, Plus, Star, Trash2, Users } from "lucide-react";
 
 import { PageIconView } from "@/components/PageIconView";
 import { useCreateDoc, type SidebarDoc } from "@/components/WorkspaceShell";
@@ -34,9 +34,10 @@ export function CommandPalette({
     router.push(path);
   }
 
-  const pinned = documents.filter((d) => d.isPinned);
-  const favorites = documents.filter((d) => d.isFavorite && !d.isPinned);
-  const recent = documents.filter((d) => !d.isPinned && !d.isFavorite).slice(0, 12);
+  const pinned = documents.filter((d) => d.isPinned && !d.shared);
+  const shared = documents.filter((d) => d.shared);
+  const favorites = documents.filter((d) => d.isFavorite && !d.isPinned && !d.shared);
+  const recent = documents.filter((d) => !d.isPinned && !d.isFavorite && !d.shared).slice(0, 12);
 
   return (
     <CommandDialog
@@ -99,6 +100,23 @@ export function CommandPalette({
                     onSelect={() => go(`/doc/${doc.id}`)}
                   >
                     <Star className="size-4 fill-amber-400 text-amber-500" />
+                    {displayPageTitle(doc.title)}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </>
+          ) : null}
+          {shared.length > 0 ? (
+            <>
+              <CommandSeparator />
+              <CommandGroup heading="Shared">
+                {shared.map((doc) => (
+                  <CommandItem
+                    key={doc.id}
+                    value={`shared ${doc.title} ${doc.id}`}
+                    onSelect={() => go(`/doc/${doc.id}`)}
+                  >
+                    <Users className="size-4 text-[#0d0d0d]/55" />
                     {displayPageTitle(doc.title)}
                   </CommandItem>
                 ))}
